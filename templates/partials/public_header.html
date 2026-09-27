@@ -1,0 +1,100 @@
+<header>
+    <nav class="site-nav fixed w-full z-50 border-b border-sky-100 bg-[#f4fbff]/95 backdrop-blur-xl transition-shadow" id="site-nav" aria-label="Primary navigation">
+        <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+            <div class="flex justify-between h-20 items-center">
+                <a href="{{ url_for('home') }}" class="flex items-center gap-3">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="IYDP" class="h-14 w-auto">
+                </a>
+
+                <ul class="hidden md:flex items-center gap-1 text-[14px] font-semibold text-slate-600 list-none m-0 p-0">
+                    <!-- About dropdown -->
+                    <li class="relative group">
+                        <button class="flex items-center gap-1 px-3 py-2 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition {% if request.endpoint in ['about'] %}text-[#00aef6]{% endif %}">
+                            About <i class="fa-solid fa-chevron-down text-[10px] transition-transform group-hover:rotate-180"></i>
+                        </button>
+                        <div class="absolute top-full left-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 translate-y-1 group-hover:translate-y-0 z-50">
+                            <a href="{{ url_for('home') }}#about" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:text-[#00aef6] hover:bg-[#f4fbff] transition">
+                                <i class="fa-solid fa-globe w-4 text-[#00aef6]"></i> Erasmus+
+                            </a>
+                            <a href="{{ url_for('home') }}#esc" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:text-[#6f3d90] hover:bg-[#f4fbff] transition">
+                                <i class="fa-solid fa-hand-holding-heart w-4 text-[#6f3d90]"></i> European Solidarity Corps
+                            </a>
+                            <a href="{{ url_for('home') }}#mission" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:text-[#7dba4e] hover:bg-[#f4fbff] transition">
+                                <i class="fa-solid fa-bullseye w-4 text-[#7dba4e]"></i> Our Mission
+                            </a>
+                        </div>
+                    </li>
+
+                    <li><a href="{{ url_for('home') }}#programs" class="px-3 py-2 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition">Projects</a></li>
+                    <li><a href="{{ url_for('home') }}#stories" class="px-3 py-2 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition">Stories</a></li>
+                    <li><a href="{{ url_for('news') }}" class="px-3 py-2 rounded-lg {% if request.endpoint in ['news', 'news_detail'] %}text-[#f06e60]{% else %}hover:text-slate-900 hover:bg-slate-100{% endif %} transition">News</a></li>
+                    <li><a href="{{ url_for('home') }}#faq" class="px-3 py-2 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition">FAQ</a></li>
+                    <li>
+                        <a href="{{ url_for('contact') }}" class="ml-2 bg-[#00aef6] text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-[#0098d4] transition">
+                            Join Us
+                        </a>
+                    </li>
+                </ul>
+
+                <button id="mobile-menu-btn" class="md:hidden p-2 text-slate-700 rounded-lg hover:bg-slate-100 transition" aria-label="Open menu" aria-controls="mobile-menu" aria-expanded="false">
+                    <i class="fa-solid fa-bars text-lg" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<div id="mobile-menu" class="fixed inset-0 z-[110] bg-white transform translate-x-full transition-transform duration-300 md:hidden overflow-y-auto" aria-hidden="true">
+    <div class="flex flex-col h-full p-6">
+        <div class="flex justify-between items-center mb-10">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="IYDP" class="h-12">
+            <button id="close-menu-btn" class="text-xl text-slate-700 p-2" aria-label="Close menu"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+        </div>
+        <nav aria-label="Mobile navigation">
+            <ul class="flex flex-col gap-1 text-[15px] font-semibold text-slate-700 list-none p-0">
+                <li class="border-l-2 border-slate-100 ml-3 pl-3 space-y-1">
+                    <p class="text-[11px] font-black uppercase tracking-widest text-slate-400 py-1">About</p>
+                    <a href="{{ url_for('home') }}#about" class="mobile-link block py-2 text-sm text-slate-600">Erasmus+</a>
+                    <a href="{{ url_for('home') }}#esc" class="mobile-link block py-2 text-sm text-slate-600">European Solidarity Corps</a>
+                    <a href="{{ url_for('home') }}#mission" class="mobile-link block py-2 text-sm text-slate-600">Our Mission</a>
+                </li>
+                <li><a href="{{ url_for('home') }}#programs" class="mobile-link block py-2.5 px-3 rounded-lg">Projects</a></li>
+                <li><a href="{{ url_for('home') }}#stories" class="mobile-link block py-2.5 px-3 rounded-lg">Stories</a></li>
+                <li><a href="{{ url_for('news') }}" class="mobile-link block py-2.5 px-3 rounded-lg {% if request.endpoint in ['news', 'news_detail'] %}text-[#f06e60] bg-[#fff5f4]{% endif %}">News</a></li>
+                <li><a href="{{ url_for('home') }}#faq" class="mobile-link block py-2.5 px-3 rounded-lg">FAQ</a></li>
+            </ul>
+        </nav>
+        <div class="mt-auto pt-6">
+            <a href="{{ url_for('contact') }}" class="mobile-link block w-full text-center bg-[#00aef6] text-white py-3.5 rounded-lg font-bold">Join Us</a>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const menuBtn = document.getElementById('mobile-menu-btn');
+    const closeBtn = document.getElementById('close-menu-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileLinks = document.querySelectorAll('.mobile-link');
+
+    function setMenuState(isOpen) {
+        if (!mobileMenu) return;
+        mobileMenu.classList.toggle('translate-x-full', !isOpen);
+        mobileMenu.setAttribute('aria-hidden', String(!isOpen));
+        menuBtn?.setAttribute('aria-expanded', String(isOpen));
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+    }
+
+    menuBtn?.addEventListener('click', function() { setMenuState(true); });
+    closeBtn?.addEventListener('click', function() { setMenuState(false); });
+    mobileLinks.forEach(function(link) {
+        link.addEventListener('click', function() { setMenuState(false); });
+    });
+
+    window.addEventListener('scroll', function() {
+        const nav = document.getElementById('site-nav');
+        if (!nav) return;
+        nav.classList.toggle('shadow-sm', window.scrollY > 40);
+    });
+});
+</script>

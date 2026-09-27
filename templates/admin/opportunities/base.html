@@ -1,0 +1,30 @@
+{% extends 'admin/base.html' %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex justify-between items-center">
+        <div>
+            <h2 class="text-2xl font-semibold text-gray-800">{% block title %}Opportunities{% endblock %}</h2>
+            <p class="text-gray-600">{% block subtitle %}{% endblock %}</p>
+        </div>
+        <div class="space-x-2">
+            {% block actions %}{% endblock %}
+            <a href="{{ url_for('list_opportunities') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#00aef6] hover:bg-[#6f3d90] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00aef6]">
+                <i class="fas fa-arrow-left mr-2"></i> Back to List
+            </a>
+        </div>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="mb-4 p-4 rounded-md {% if category == 'success' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+{% block opportunity_content %}{% endblock %}
+{% endblock %}

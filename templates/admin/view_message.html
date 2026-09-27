@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Message | IYDP </title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        html { font-size: 125%; }
+        @font-face { font-family: 'Asterone'; src: local('Asterone'); }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #0f172a; }
+        .display-font { font-family: 'Asterone', sans-serif; letter-spacing: 0.05em; }
+        :root { --iydp-blue: #00aef6; --iydp-red: #f06e60; --iydp-green: #7dba4e; --iydp-purple: #6f3d90; }
+        .rounded-panel { background: #ffffff; border-radius: 2.5rem; border: 1px solid #e2e8f0; }
+        .nav-pill { border-radius: 9999px; font-weight: 700; transition: all 0.3s ease; color: #64748b; }
+        .nav-pill:hover { background: #f8fafc; color: #0f172a; }
+        .nav-pill.active { background: var(--iydp-purple); color: #fff !important; box-shadow: 0 10px 20px -5px rgba(111, 61, 144, 0.3); }
+        .btn-reply { border-radius: 9999px; background: var(--iydp-blue); color: #fff; font-weight: 800; text-transform: uppercase; transition: all 0.3s ease; }
+        .btn-reply:hover { transform: translateY(-2px); box-shadow: 0 10px 15px rgba(0, 174, 246, 0.2); }
+        .status-dot { box-shadow: 0 0 10px currentColor; }
+    </style>
+</head>
+<body class="antialiased p-3 lg:p-6">
+    <div class="flex flex-col lg:flex-row min-h-screen gap-6">
+        
+        {% include 'admin/partials/sidebar.html' %}
+
+        <main class="flex-1 lg:pr-4">
+            <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 px-4">
+                <div>
+                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">Message Details</h2>
+                    <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">Message from {{ message.name }}</p>
+                </div>
+                <a href="{{ url_for('list_messages') }}" class="btn-reply px-8 py-4 text-xs bg-slate-900 hover:bg-slate-800">
+                    <i class="fas fa-arrow-left mr-2"></i> Back to Inbox
+                </a>
+            </header>
+
+            <div class="rounded-panel overflow-hidden shadow-sm bg-white">
+                <div class="px-8 py-8 border-b border-slate-50 bg-slate-50/30">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div class="flex items-center gap-5">
+                            <div class="w-16 h-16 rounded-3xl bg-[#00aef6] text-white flex items-center justify-center text-2xl font-black shadow-lg shadow-[#00aef6]/20">
+                                {{ message.name[:1].upper() }}
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-black text-slate-900">{{ message.name }}</h3>
+                                <p class="text-sm font-bold text-[#00aef6]">{{ message.email }}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Received Date</div>
+                            <div class="text-sm font-black text-slate-700"><i class="far fa-calendar-alt mr-2 text-[#00aef6]"></i>{{ message.created_at|az_time }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-8">
+                    <div class="bg-slate-50 rounded-[2rem] p-8 min-h-[200px] border border-slate-100 relative">
+                        <div class="relative z-10 text-slate-700 leading-relaxed font-medium">
+                            {{ message.message|replace('\n', '<br>')|safe }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-8 py-6 border-t border-slate-50 bg-slate-50/20 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div class="flex flex-col gap-1">
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <form action="{{ url_for('delete_message', message_id=message.id) }}" method="POST" onsubmit="return confirm('Bu mesajı birdəfəlik silmək istəyirsiniz?');">
+                            <button type="submit" class="px-6 py-3 rounded-full border-2 border-slate-100 text-slate-400 font-black text-[10px] uppercase hover:bg-red-500 hover:text-white hover:border-red-500 transition-all">
+                                <i class="fas fa-trash-alt mr-2"></i> Delete
+                            </button>
+                        </form>
+                        <a href="mailto:{{ message.email }}" class="btn-reply px-10 py-3 text-[10px]">
+                            <i class="fas fa-paper-plane mr-2"></i> Reply Message
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

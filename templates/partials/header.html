@@ -1,0 +1,86 @@
+<header class="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+    <div class="h-1 w-full bg-gradient-to-r from-[#00aef6] via-[#6f3d90] to-[#7dba4e]"></div>
+    <nav class="max-w-[1280px] mx-auto px-5 lg:px-8 py-3" aria-label="Primary navigation">
+        <div class="flex items-center justify-between">
+            <a href="{{ url_for('home') }}" class="flex items-center gap-3">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="IYDP Logo" class="h-11 w-auto">
+                <div class="hidden sm:block leading-tight">
+                    <p class="text-[10px] font-black uppercase tracking-[0.18em] text-[#00aef6]">International Youth</p>
+                    <p class="text-xs font-black uppercase tracking-[0.12em] text-[#0f172a]">Dialogue Platform</p>
+                </div>
+            </a>
+
+            <ul class="hidden lg:flex items-center gap-2 list-none m-0 p-0 text-[11px] font-black uppercase tracking-[0.16em]">
+                <li><a href="{{ url_for('home') }}" class="px-4 py-2 rounded-full transition-colors {% if request.endpoint == 'home' %}bg-[#00aef6]/10 text-[#00aef6]{% else %}text-slate-600 hover:text-slate-900{% endif %}" {% if request.endpoint == 'home' %}aria-current="page"{% endif %}>Home</a></li>
+                <li><a href="{{ url_for('opportunities') }}" class="px-4 py-2 rounded-full transition-colors {% if request.endpoint in ['opportunities', 'view_opportunity'] %}bg-[#00aef6]/10 text-[#00aef6]{% else %}text-slate-600 hover:text-slate-900{% endif %}" {% if request.endpoint in ['opportunities', 'view_opportunity'] %}aria-current="page"{% endif %}>Opportunities</a></li>
+                <li><a href="{{ url_for('news') }}" class="px-4 py-2 rounded-full transition-colors {% if request.endpoint in ['news', 'news_detail'] %}bg-[#f06e60]/10 text-[#f06e60]{% else %}text-slate-600 hover:text-slate-900{% endif %}" {% if request.endpoint in ['news', 'news_detail'] %}aria-current="page"{% endif %}>News</a></li>
+                <li><a href="{{ url_for('blog') }}" class="px-4 py-2 rounded-full transition-colors {% if request.endpoint in ['blog', 'blog_post'] %}bg-[#6f3d90]/10 text-[#6f3d90]{% else %}text-slate-600 hover:text-slate-900{% endif %}" {% if request.endpoint in ['blog', 'blog_post'] %}aria-current="page"{% endif %}>Blog</a></li>
+                <li><a href="{{ url_for('contact') }}" class="px-4 py-2 rounded-full transition-colors {% if request.endpoint == 'contact' %}bg-[#7dba4e]/10 text-[#7dba4e]{% else %}text-slate-600 hover:text-slate-900{% endif %}" {% if request.endpoint == 'contact' %}aria-current="page"{% endif %}>Contact</a></li>
+            </ul>
+
+            <div class="flex items-center gap-3">
+                <span class="hidden md:inline-flex rounded-full border border-[#00aef6]/20 bg-[#00aef6]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#00aef6]">
+                    Youth Platform
+                </span>
+                <a href="{{ url_for('contact') }}" class="hidden md:inline-flex items-center rounded-xl bg-[#00aef6] px-5 py-2.5 text-[11px] font-black uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#6f3d90]">
+                    Join Community
+                </a>
+                <button id="mobile-menu-btn" type="button" aria-controls="mobile-menu" aria-expanded="false" aria-label="Open menu"
+                        class="lg:hidden rounded-xl bg-slate-100 px-3 py-2 text-slate-700 transition-colors hover:bg-[#00aef6] hover:text-white">
+                    <i class="fa-solid fa-bars" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<div id="mobile-menu" class="fixed inset-0 z-[110] bg-white/95 backdrop-blur-md transform translate-x-full transition-transform duration-300 ease-in-out lg:hidden overflow-y-auto"
+     role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="mx-auto max-w-[1280px] px-5 py-8">
+        <div class="mb-8 flex items-center justify-between">
+            <a href="{{ url_for('home') }}" class="flex items-center gap-3">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="IYDP Logo" class="h-10 w-auto">
+                <span class="text-xs font-black uppercase tracking-[0.16em] text-slate-700">IYDP</span>
+            </a>
+            <button id="close-menu-btn" type="button" aria-label="Close menu" class="rounded-lg bg-slate-100 px-3 py-2 text-slate-700">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <nav aria-label="Mobile navigation">
+            <ul class="space-y-2 list-none m-0 p-0 text-sm font-black uppercase tracking-[0.14em]">
+                <li><a href="{{ url_for('home') }}" class="mobile-link block rounded-xl px-4 py-3 {% if request.endpoint == 'home' %}bg-[#00aef6]/10 text-[#00aef6]{% else %}text-slate-700{% endif %}">Home</a></li>
+                <li><a href="{{ url_for('opportunities') }}" class="mobile-link block rounded-xl px-4 py-3 {% if request.endpoint in ['opportunities', 'view_opportunity'] %}bg-[#00aef6]/10 text-[#00aef6]{% else %}text-slate-700{% endif %}">Opportunities</a></li>
+                <li><a href="{{ url_for('news') }}" class="mobile-link block rounded-xl px-4 py-3 {% if request.endpoint in ['news', 'news_detail'] %}bg-[#f06e60]/10 text-[#f06e60]{% else %}text-slate-700{% endif %}">News</a></li>
+                <li><a href="{{ url_for('blog') }}" class="mobile-link block rounded-xl px-4 py-3 {% if request.endpoint in ['blog', 'blog_post'] %}bg-[#6f3d90]/10 text-[#6f3d90]{% else %}text-slate-700{% endif %}">Blog</a></li>
+                <li><a href="{{ url_for('contact') }}" class="mobile-link block rounded-xl px-4 py-3 {% if request.endpoint == 'contact' %}bg-[#7dba4e]/10 text-[#7dba4e]{% else %}text-slate-700{% endif %}">Contact</a></li>
+            </ul>
+        </nav>
+        <a href="{{ url_for('contact') }}" class="mobile-link mt-8 inline-flex w-full items-center justify-center rounded-xl bg-[#00aef6] px-5 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white">
+            Join Community
+        </a>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const menuBtn = document.getElementById('mobile-menu-btn');
+    const closeBtn = document.getElementById('close-menu-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileLinks = document.querySelectorAll('.mobile-link');
+
+    function setMenuState(isOpen) {
+        if (!mobileMenu) return;
+        mobileMenu.classList.toggle('translate-x-full', !isOpen);
+        mobileMenu.setAttribute('aria-hidden', String(!isOpen));
+        menuBtn?.setAttribute('aria-expanded', String(isOpen));
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+    }
+
+    menuBtn?.addEventListener('click', function() { setMenuState(true); });
+    closeBtn?.addEventListener('click', function() { setMenuState(false); });
+    mobileLinks.forEach(function(link) {
+        link.addEventListener('click', function() { setMenuState(false); });
+    });
+});
+</script>

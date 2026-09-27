@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Opportunity | IYDP Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        html { font-size: 125%; }
+        @font-face { font-family: 'Asterone'; src: local('Asterone'); }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #0f172a; }
+        .display-font { font-family: 'Asterone', sans-serif; letter-spacing: 0.05em; }
+        
+        :root {
+            --iydp-blue: #00aef6; --iydp-red: #f06e60;
+            --iydp-green: #7dba4e; --iydp-purple: #6f3d90;
+        }
+
+        .rounded-panel { background: #ffffff; border-radius: 2.5rem; border: 1px solid #e2e8f0; }
+        
+        .nav-pill {
+            border-radius: 9999px; font-weight: 700; transition: all 0.3s ease; color: #64748b;
+        }
+        .nav-pill:hover { background: #f8fafc; color: #0f172a; }
+        .nav-pill.active {
+            background: var(--iydp-purple); color: #fff !important;
+            box-shadow: 0 10px 20px -5px rgba(111, 61, 144, 0.3);
+        }
+
+        .input-field {
+            border-radius: 1.25rem; border: 1.5px solid #e2e8f0; padding: 0.85rem 1.25rem;
+            transition: all 0.3s ease; width: 100%; outline: none; background: #fff;
+        }
+        .input-field:focus { border-color: var(--iydp-red); ring: 4px rgba(240, 110, 96, 0.1); }
+
+        .btn-update {
+            border-radius: 9999px; background: #0f172a; color: #fff;
+            font-weight: 800; text-transform: uppercase; transition: all 0.3s ease;
+            cursor: pointer; border: none;
+        }
+        .btn-update:hover { background: var(--iydp-red); transform: translateY(-2px); }
+        
+        .btn-cancel {
+            border-radius: 9999px; background: #f1f5f9; color: #64748b;
+            font-weight: 800; text-transform: uppercase; transition: all 0.3s ease;
+            text-align: center;
+        }
+        .btn-cancel:hover { background: #e2e8f0; color: #0f172a; }
+
+        .btn-delete {
+            border-radius: 9999px; background: #fff; color: var(--iydp-red);
+            font-weight: 800; text-transform: uppercase; transition: all 0.3s ease;
+            border: 1.5px solid #fee2e2;
+        }
+        .btn-delete:hover { background: #fef2f2; border-color: var(--iydp-red); }
+    </style>
+</head>
+<body class="antialiased p-3 lg:p-6">
+
+    <div class="flex flex-col lg:flex-row min-h-screen gap-6">
+         {% include 'admin/partials/sidebar.html' %}
+
+        <main class="flex-1 lg:pr-4">
+            <header class="mb-10 px-4">
+                <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">Edit Opportunity</h2>
+                <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">Update existing program details</p>
+            </header>
+
+            <div class="rounded-panel p-8 lg:p-12 shadow-sm max-w-6xl">
+                <form method="POST" action="{{ url_for('edit_opportunity', id=opportunity.id) }}" class="space-y-8">
+                    
+                    <div class="space-y-2">
+                        <label for="title" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Program Title *</label>
+                        <input type="text" name="title" id="title" value="{{ opportunity.title }}" required
+                               class="input-field text-sm font-bold text-slate-700">
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-2">
+                            <label for="description" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Brief Description *</label>
+                            <textarea id="description" name="description" rows="5" required
+                                      class="input-field text-sm font-medium text-slate-700 leading-relaxed resize-none">{{ opportunity.description }}</textarea>
+                        </div>
+                        <div class="space-y-2">
+                            <label for="requirements" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Specific Requirements</label>
+                            <textarea id="requirements" name="requirements" rows="5"
+                                      class="input-field text-sm font-medium text-slate-700 leading-relaxed resize-none" placeholder="One requirement per line...">{{ opportunity.requirements or '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-2">
+                            <label for="location" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Location</label>
+                            <div class="relative">
+                                <i class="fas fa-map-marker-alt absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
+                                <input type="text" name="location" id="location" value="{{ opportunity.location or '' }}"
+                                       class="input-field pl-12 text-sm font-bold text-slate-700" placeholder="e.g. Baku, Azerbaijan">
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label for="deadline" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Application Deadline</label>
+                            <div class="relative">
+                                <i class="fas fa-calendar absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
+                                <input type="date" name="deadline" id="deadline" value="{{ deadline }}"
+                                       class="input-field pl-12 text-sm font-bold text-slate-700">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label for="tags" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Tags (Comma separated)</label>
+                        <input type="text" name="tags" id="tags" 
+                               value="{{ opportunity.tags|map(attribute='name')|join(', ') }}"
+                               class="input-field text-sm font-bold text-slate-700" 
+                               placeholder="Leadership, Youth, Global Development...">
+                    </div>
+
+                    <div class="flex items-center justify-between p-6 rounded-[2rem] bg-slate-50 border border-slate-100">
+                        <div class="flex items-center gap-4">
+                            <div class="relative inline-block w-12 h-6">
+                                <input type="checkbox" name="is_active" id="is_active" 
+                                       class="opacity-0 w-0 h-0 peer" {% if opportunity.is_active %}checked{% endif %}>
+                                <label for="is_active" 
+                                       class="absolute top-0 left-0 right-0 bottom-0 bg-slate-300 rounded-full cursor-pointer transition-all duration-300 peer-checked:bg-[#7dba4e]
+                                              before:absolute before:content-[''] before:h-4 before:w-4 before:left-1 before:bottom-1 before:bg-white before:rounded-full before:transition-all peer-checked:before:translate-x-6"></label>
+                            </div>
+                            <div>
+                                <label for="is_active" class="text-sm font-black text-slate-700 cursor-pointer uppercase tracking-tight">Active Status</label>
+                                <p class="text-[10px] font-bold text-slate-400">Visibility on the main platform</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row justify-between items-center gap-6 pt-6 border-t border-slate-50">
+                        <button type="button" onclick="confirmDelete()" class="btn-delete px-8 py-4 text-[10px] w-full sm:w-auto">
+                            <i class="fas fa-trash-alt mr-2"></i> Delete Entry
+                        </button>
+
+                        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                            <a href="{{ url_for('list_opportunities') }}" class="btn-cancel px-10 py-4 text-[10px]">
+                                Discard
+                            </a>
+                            <button type="submit" class="btn-update px-12 py-4 text-[10px] shadow-lg shadow-red-100">
+                                Update Opportunity
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <form id="delete-form" action="{{ url_for('delete_opportunity', id=opportunity.id) }}" method="POST" class="hidden"></form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function confirmDelete() {
+            if (confirm('Are you sure you want to delete this opportunity? This action cannot be undone.')) {
+                document.getElementById('delete-form').submit();
+            }
+        }
+    </script>
+</body>
+</html>

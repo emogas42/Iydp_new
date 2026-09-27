@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IYDP | News</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        html { font-size: 100%; }
+        @keyframes word-enter {
+            from { opacity: 0; transform: translateY(10px); filter: blur(2px); }
+            to   { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+        .word-swap-enter { animation: word-enter 350ms ease; }
+    </style>
+</head>
+<body class="bg-white text-slate-800 antialiased font-sans">
+{% include 'partials/public_header.html' %}
+
+<section class="relative min-h-[56vh] flex items-center overflow-hidden bg-[#f4fbff] pt-20 pb-16">
+    <div class="absolute inset-0 z-0">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(0,174,246,0.16),transparent_42%)]"></div>
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_85%_75%,rgba(125,186,78,0.14),transparent_40%)]"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-[#f7fcff] via-[#edf7ff] to-[#f8fbff]"></div>
+    </div>
+    <div class="relative max-w-[1280px] mx-auto px-5 lg:px-8 w-full z-10 text-center">
+        <h1 class="text-4xl md:text-6xl lg:text-7xl font-black text-[#0f172a] mb-8 leading-[1.05] tracking-tight text-center">
+            LATEST
+            <span class="block w-full text-center text-[#f06e60]">UPDATES</span>
+        </h1>
+        <p class="mx-auto max-w-3xl text-lg md:text-xl text-slate-600 font-semibold leading-relaxed px-2 py-2">
+            Stay informed with the latest
+            <span id="newsOpportunityWord" class="inline-flex min-w-[12ch] justify-center font-black text-white bg-[#00aef6] rounded-full px-3 py-1 word-swap-enter">happenings</span>
+            from the platform.
+        </p>
+    </div>
+</section>
+
+<section class="py-8 bg-[#f8fafc] relative z-30">
+    <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+        <form action="{{ url_for('news') }}" method="GET" id="filterForm" class="bg-white p-5 md:p-6 rounded-[2rem] shadow-xl shadow-slate-200/60 border border-slate-100 -mt-12">
+            <div class="flex flex-col gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="md:col-span-2 relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" name="search" value="{{ search or '' }}"
+                               placeholder="Search for news..."
+                               class="w-full pl-14 pr-4 py-4 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-[#f06e60]/50 focus:bg-white transition-all font-medium text-slate-700 shadow-sm">
+                    </div>
+                    <div class="relative">
+                        <select name="sort" onchange="this.form.submit()"
+                                class="w-full px-5 py-4 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-[#f06e60]/50 focus:bg-white font-bold text-slate-600 appearance-none cursor-pointer shadow-sm">
+                            <option value="newest" {{ 'selected' if current_sort == 'newest' }}>Newest First</option>
+                            <option value="alphabetical" {{ 'selected' if current_sort == 'alphabetical' }}>Alphabetical (A-Z)</option>
+                            <option value="oldest" {{ 'selected' if current_sort == 'oldest' }}>Oldest First</option>
+                        </select>
+                        <i class="fa-solid fa-arrow-down-wide-short absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
+                    <button type="submit" class="bg-[#0f172a] text-white font-bold py-4 rounded-xl hover:bg-[#f06e60] transition-all duration-300 uppercase tracking-widest text-xs shadow-md">
+                        Find News
+                    </button>
+                </div>
+                {% if search or current_sort != 'newest' %}
+                <div class="flex items-center justify-between px-2 pt-2 border-t border-slate-50 mt-2">
+                    <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#7dba4e]"></span>
+                        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Found {{ news.total }} results</p>
+                    </div>
+                    <a href="{{ url_for('news') }}" class="text-[10px] font-black text-[#f06e60] uppercase tracking-[0.15em] flex items-center gap-2 bg-[#f06e60]/10 px-3 py-1.5 rounded-lg">
+                        <i class="fa-solid fa-filter-circle-xmark"></i> Clear All Filters
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</section>
+
+<section class="pb-24 bg-[#f8fafc]">
+    <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-7">
+            {% for item in news.items %}
+            <div class="group relative bg-white rounded-2xl border border-slate-200/80 flex flex-col md:flex-row h-full cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-slate-200/50 overflow-hidden">
+                <a href="{{ url_for('news_detail', id=item.id) }}" class="absolute inset-0 z-20"></a>
+                <div class="relative h-52 md:h-auto md:w-[42%] overflow-hidden border-b md:border-b-0 md:border-r border-slate-100 shrink-0">
+                    {% if item.cover_image %}
+                        <img src="{{ item.cover_image }}" alt="{{ item.title }}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                    {% else %}
+                        <div class="w-full h-full bg-slate-100 flex items-center justify-center">
+                            <i class="fa-solid fa-image text-slate-300 text-4xl"></i>
+                        </div>
+                    {% endif %}
+                    <div class="absolute top-4 left-4 z-10">
+                        <span class="inline-flex items-center gap-2 bg-[#0f172a]/80 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                            <i class="fa-regular fa-clock text-[9px]"></i>{{ item.created_at.strftime('%d %b %Y') }}
+                        </span>
+                    </div>
+                </div>
+                <div class="p-6 flex flex-col h-full relative md:w-[58%]">
+                    <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                        <span class="inline-flex items-center gap-2 text-[11px] font-black text-[#f06e60] uppercase tracking-[0.15em]">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#f06e60]"></span>News Brief
+                        </span>
+                        <span class="text-[11px] font-semibold text-slate-500">{{ item.view_count or 0 }} views</span>
+                    </div>
+                    <h3 class="font-extrabold text-[#0f172a] leading-tight group-hover:text-[#f06e60] transition-colors duration-200 text-[1.2rem] line-clamp-3 mb-4">
+                        {{ item.title }}
+                    </h3>
+                    <p class="text-slate-600 text-sm leading-relaxed line-clamp-4 mb-6">
+                        {{ item.content|striptags }}
+                    </p>
+                    <div class="mt-auto pt-5 border-t border-slate-100 flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500">Published {{ item.created_at.strftime('%d %b, %Y') }}</span>
+                        <div class="text-[#f06e60] font-black text-[11px] uppercase tracking-wider flex items-center gap-2">
+                            Read Update <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if news.pages > 1 %}
+        <div class="mt-16 flex justify-center">
+            <nav class="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+                {% if news.has_prev %}
+                    <a href="{{ url_for('news', page=news.prev_num, search=search, sort=current_sort) }}"
+                       class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-[#f06e60] hover:text-white transition-all">
+                        <i class="fas fa-chevron-left text-xs"></i>
+                    </a>
+                {% endif %}
+                {% for page_num in news.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                    {% if page_num %}
+                        {% if page_num != news.page %}
+                            <a href="{{ url_for('news', page=page_num, search=search, sort=current_sort) }}"
+                               class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-[#f06e60] hover:text-white transition-all font-bold text-sm">{{ page_num }}</a>
+                        {% else %}
+                            <span class="w-12 h-12 flex items-center justify-center rounded-xl bg-[#f06e60] text-white font-bold text-sm">{{ page_num }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="px-2 text-slate-400">...</span>
+                    {% endif %}
+                {% endfor %}
+                {% if news.has_next %}
+                    <a href="{{ url_for('news', page=news.next_num, search=search, sort=current_sort) }}"
+                       class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-[#f06e60] hover:text-white transition-all">
+                        <i class="fas fa-chevron-right text-xs"></i>
+                    </a>
+                {% endif %}
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<script>
+(function rotateNewsWord() {
+    const wordEl = document.getElementById('newsOpportunityWord');
+    if (!wordEl) return;
+    const words = [
+        { text: 'happenings', bg: '#00aef6' },
+        { text: 'global events', bg: '#f06e60' },
+        { text: 'announcements', bg: '#7dba4e' }
+    ];
+    let index = 0;
+    function applyWord(w) {
+        wordEl.textContent = w.text;
+        wordEl.style.backgroundColor = w.bg;
+    }
+    applyWord(words[index]);
+    setInterval(() => {
+        index = (index + 1) % words.length;
+        wordEl.classList.remove('word-swap-enter');
+        void wordEl.offsetWidth;
+        applyWord(words[index]);
+        wordEl.classList.add('word-swap-enter');
+    }, 3000);
+})();
+</script>
+
+{% include 'partials/public_footer.html' %}
+</body>
+</html>

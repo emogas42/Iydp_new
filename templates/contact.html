@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IYDP | Contact</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        html { font-size: 100%; }
+        .nav-link {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: #00aef6;
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+        .nav-link:hover::after {
+            width: 100%;
+        }
+        .glass-nav {
+            background: rgba(248, 250, 252, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-white text-slate-800 antialiased font-sans">
+{% include 'partials/public_header.html' %}
+
+
+<section id="contact" class="py-24 lg:py-28 bg-[#f8fafc] relative overflow-hidden">
+    <div class="absolute -top-24 -right-24 w-96 h-96 bg-[#7dba4e]/5 rounded-full blur-3xl opacity-60 pointer-events-none"></div>
+    
+    <div class="max-w-[1280px] mx-auto px-5 lg:px-8 relative z-10">
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-12 xl:gap-16">
+            
+            <div class="lg:col-span-2 space-y-10">
+                <div>
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="h-[2px] w-10 bg-[#7dba4e]"></span>
+                        <span class="text-[#7dba4e] text-[11px] font-black uppercase tracking-[0.3em]">Contact Us</span>
+                    </div>
+                    <h2 class="text-4xl md:text-5xl font-black text-[#0f172a] tracking-tighter uppercase leading-none">
+                        Let's <span class="text-[#7dba4e]">Connect</span>
+                    </h2>
+                    <p class="mt-6 text-slate-500 leading-relaxed font-medium">
+                        Baku, Azerbaijan — Visit our headquarters at Globus Center.
+                    </p>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="group flex items-center gap-5 p-5 bg-white rounded-[1.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-md hover:border-[#7dba4e]/30">
+                        <div class="w-12 h-12 shrink-0 rounded-xl bg-[#7dba4e]/10 flex items-center justify-center text-[#7dba4e] group-hover:bg-[#7dba4e] group-hover:text-white transition-all">
+                            <i class="fa-solid fa-location-dot text-lg"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Our Office</span>
+                            <span class="font-bold text-[#0f172a] text-sm leading-tight">13th floor, Globus Center, Baku</span>
+                        </div>
+                    </div>
+
+                    <a href="mailto:info@iydp.org" class="group flex items-center gap-5 p-5 bg-white rounded-[1.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-md hover:border-[#7dba4e]/30">
+                        <div class="w-12 h-12 shrink-0 rounded-xl bg-[#7dba4e]/10 flex items-center justify-center text-[#7dba4e] group-hover:bg-[#7dba4e] group-hover:text-white transition-all">
+                            <i class="fa-solid fa-at text-lg"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Email us</span>
+                            <span class="font-bold text-[#0f172a]">info@iydp.org</span>
+                        </div>
+                    </a>
+
+                    <a href="tel:+994518774115" class="group flex items-center gap-5 p-5 bg-white rounded-[1.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-md hover:border-[#7dba4e]/30">
+                        <div class="w-12 h-12 shrink-0 rounded-xl bg-[#7dba4e]/10 flex items-center justify-center text-[#7dba4e] group-hover:bg-[#7dba4e] group-hover:text-white transition-all">
+                            <i class="fa-solid fa-phone text-lg"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Call us</span>
+                            <span class="font-bold text-[#0f172a]">+994 (51) 877 41 15</span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="lg:col-span-3 space-y-8">
+                <div class="bg-white p-8 md:p-12 lg:p-14 rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-100 relative overflow-hidden">
+                    <form id="contactForm" action="{{ url_for('contact') }}" method="POST" class="space-y-6 relative z-10">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black uppercase text-[#0f172a] ml-1 tracking-widest">Full Name</label>
+                                <input type="text" name="name" placeholder="John Doe" required 
+                                    class="w-full bg-slate-50 border border-slate-100 focus:border-[#7dba4e] focus:bg-white p-4 rounded-2xl outline-none transition-all font-semibold text-slate-700">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black uppercase text-[#0f172a] ml-1 tracking-widest">Email Address</label>
+                                <input type="email" name="email" placeholder="john@example.com" required 
+                                    class="w-full bg-slate-50 border border-slate-100 focus:border-[#7dba4e] focus:bg-white p-4 rounded-2xl outline-none transition-all font-semibold text-slate-700">
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black uppercase text-[#0f172a] ml-1 tracking-widest">Your Message</label>
+                            <textarea name="message" rows="4" placeholder="How can we help?" required 
+                                class="w-full bg-slate-50 border border-slate-100 focus:border-[#7dba4e] focus:bg-white p-4 rounded-2xl outline-none transition-all font-semibold text-slate-700 resize-none"></textarea>
+                        </div>
+
+                        <button type="submit" id="submitBtn" class="w-full bg-[#0f172a] text-white font-black py-5 rounded-2xl hover:bg-[#7dba4e] hover:shadow-xl hover:shadow-[#7dba4e]/20 transition-all duration-300 uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-3">
+                            <span>Send Message</span>
+                            <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                        </button>
+                    </form>
+                </div>
+
+                <div class="w-full h-[26rem] rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-lg relative group">
+                    <iframe 
+                        width="100%" 
+                        height="100%" 
+                        frameborder="0" 
+                        scrolling="no" 
+                        marginheight="0" 
+                        marginwidth="0" 
+                        src="https://www.openstreetmap.org/export/embed.html?bbox=49.8180,40.3800,49.8320,40.3900&amp;layer=mapnik&amp;marker=40.3853,49.8250" 
+                        class="grayscale hover:grayscale-0 transition-all duration-700 contrast-125">
+                    </iframe>
+                    <div class="absolute bottom-4 right-4 bg-white/80 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] font-bold text-slate-600 shadow-sm pointer-events-none">
+                        Globus Center, Baku
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% include 'partials/public_footer.html' %}
+
+</body>
+</html>
