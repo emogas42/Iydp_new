@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | IYDP </title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        html { font-size: 125%; }
+        @font-face {
+            font-family: 'Asterone';
+            src: local('Asterone');
+        }
+
+        body { 
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+
+        .display-font { font-family: 'Asterone', sans-serif; letter-spacing: 0.05em; }
+
+        :root {
+            --iydp-blue: #00aef6;
+            --iydp-red: #f06e60;
+            --iydp-green: #7dba4e;
+            --iydp-purple: #6f3d90;
+        }
+
+        .rounded-panel {
+            background: #ffffff;
+            border-radius: 2.5rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+        }
+
+        .nav-pill {
+            border-radius: 9999px;
+            font-weight: 700;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: #64748b;
+        }
+
+        .nav-pill:hover { background: #f8fafc; color: #0f172a; }
+        
+        .nav-pill.active {
+            background: var(--iydp-purple);
+            color: #ffffff !important;
+            box-shadow: 0 10px 20px -5px rgba(111, 61, 144, 0.3);
+        }
+
+        .btn-action {
+            border-radius: 9999px;
+            background: #0f172a;
+            color: #ffffff;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.3s ease;
+        }
+
+        .btn-action:hover {
+            background: var(--iydp-purple);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-dot {
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        @media (max-width: 1024px) {
+            .mobile-sidebar { display: none; }
+            .mobile-sidebar.active { display: flex; position: fixed; inset: 0; z-index: 50; }
+        }
+    </style>
+</head>
+<body class="antialiased p-3 lg:p-6">
+
+    <div class="flex flex-col lg:flex-row min-h-screen gap-6">
+      {% include 'admin/partials/sidebar.html' %}
+
+        <main class="flex-1 lg:pr-4">
+            <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 px-4">
+                <div>
+                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase tracking-tight">System Overview</h2>
+                    <p class="text-slate-500 font-bold text-lg mt-1">Welcome back, {{ current_user.username }}</p>
+                </div>
+                <div class="flex gap-3 w-full md:w-auto">
+                    <a href="{{ url_for('add_news') }}" class="btn-action flex-1 md:flex-none px-8 py-4 text-xs text-center">
+                        <i class="fas fa-plus mr-2"></i> New Release
+                    </a>
+                </div>
+            </header>
+
+       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+    <div class="rounded-panel p-8 border-b-4" style="border-bottom-color: var(--iydp-blue);">
+        <div class="flex justify-between items-start mb-4">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Messages</p>
+            <i class="fas fa-envelope text-[#00aef6]/30 text-xl"></i>
+        </div>
+        <h3 class="text-5xl font-black text-slate-900 tracking-tighter">{{ total_messages }}</h3>
+    </div>
+
+    <div class="rounded-panel p-8 border-b-4" style="border-bottom-color: var(--iydp-red);">
+        <div class="flex justify-between items-start mb-4">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unread</p>
+            <i class="fas fa-bell text-red-100 text-xl animate-pulse"></i>
+        </div>
+        <h3 class="text-5xl font-black text-red-500 tracking-tighter">{{ unread_count }}</h3>
+    </div>
+
+    <div class="rounded-panel p-8 border-b-4" style="border-bottom-color: var(--iydp-green);">
+        <div class="flex justify-between items-start mb-4">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total News</p>
+            <i class="fas fa-globe text-green-100 text-xl"></i>
+        </div>
+        <h3 class="text-5xl font-black text-slate-900 tracking-tighter">{{ total_news }}</h3>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+    <a href="{{ url_for('list_members') }}" class="rounded-panel p-8 border-b-4 hover:-translate-y-0.5 transition-all" style="border-bottom-color: var(--iydp-blue);">
+        <div class="flex justify-between items-start mb-4">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Members</p>
+            <i class="fas fa-users text-[#00aef6]/30 text-xl"></i>
+        </div>
+        <h3 class="text-4xl font-black text-slate-900 tracking-tighter">{{ total_members }}</h3>
+    </a>
+    <a href="{{ url_for('list_members', vip='active') }}" class="rounded-panel p-8 border-b-4 hover:-translate-y-0.5 transition-all" style="border-bottom-color: var(--iydp-purple);">
+        <div class="flex justify-between items-start mb-4">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">VIP Members</p>
+            <i class="fas fa-crown text-[#6f3d90]/30 text-xl"></i>
+        </div>
+        <h3 class="text-4xl font-black text-[#6f3d90] tracking-tighter">{{ total_vip }}</h3>
+    </a>
+    <a href="{{ url_for('list_vip_requests') }}" class="rounded-panel p-8 border-b-4 hover:-translate-y-0.5 transition-all" style="border-bottom-color: #f59e0b;">
+        <div class="flex justify-between items-start mb-4">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pending VIP</p>
+            <i class="fas fa-hourglass-half text-amber-300 text-xl"></i>
+        </div>
+        <h3 class="text-4xl font-black text-amber-500 tracking-tighter">{{ pending_vip }}</h3>
+    </a>
+    <a href="{{ url_for('list_events') }}" class="rounded-panel p-8 border-b-4 hover:-translate-y-0.5 transition-all" style="border-bottom-color: var(--iydp-green);">
+        <div class="flex justify-between items-start mb-4">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Events</p>
+            <i class="fas fa-calendar-days text-green-300 text-xl"></i>
+        </div>
+        <h3 class="text-4xl font-black text-slate-900 tracking-tighter">{{ total_events }}</h3>
+    </a>
+</div>
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-8 pb-10">
+                <div class="xl:col-span-2 rounded-panel overflow-hidden flex flex-col">
+                    <div class="px-10 py-8 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center">
+                        <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">Communication Center</h3>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Latest 5</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">
+                                    <th class="px-10 py-5">Sender</th>
+                                    <th class="px-10 py-5">Status</th>
+                                    <th class="px-10 py-5 text-right">Operation</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                {% for message in recent_messages %}
+                                <tr class="hover:bg-slate-50/80 transition-all group">
+                                    <td class="px-10 py-6">
+                                        <div class="text-sm font-black text-slate-900">{{ message.name }}</div>
+                                        <div class="text-[11px] font-bold text-slate-400 uppercase mt-0.5">{{ message.email }}</div>
+                                    </td>
+                                    <td class="px-10 py-6">
+                                        {% if not message.is_read %}
+                                            <span class="px-4 py-1.5 rounded-full text-[9px] font-black uppercase bg-[#00aef6]/10 text-[#00aef6] border border-[#00aef6]/20">Pending</span>
+                                        {% else %}
+                                            <span class="px-4 py-1.5 rounded-full text-[9px] font-black uppercase bg-slate-100 text-slate-400">Processed</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-10 py-6 text-right">
+                                        <a href="{{ url_for('view_message', message_id=message.id) }}" class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-900 text-white hover:bg-[#6f3d90] transition-all group-hover:scale-110">
+                                            <i class="fas fa-chevron-right text-xs"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="rounded-panel p-8 flex flex-col">
+                    <div class="flex items-center justify-between mb-8 pb-4 border-b border-slate-50">
+                        <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">Last news</h3>
+                        <a href="{{ url_for('list_news') }}" class="text-[10px] font-black text-slate-400 hover:text-[#6f3d90] uppercase border-b border-slate-200">View All</a>
+                    </div>
+                    <div class="space-y-8 flex-1">
+                        {% for news_item in recent_news %}
+                        <div class="relative pl-6 border-l-4 border-slate-100 hover:border-[#6f3d90] transition-all cursor-pointer group">
+                            <p class="text-[9px] font-black text-slate-400 uppercase mb-2 tracking-tighter">
+                                {{ news_item.created_at|az_time }}
+                            </p>
+                            <h4 class="text-sm font-bold text-slate-800 leading-tight group-hover:text-slate-900 transition-colors">
+                                {{ news_item.title }}
+                            </h4>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+</body>
+</html>

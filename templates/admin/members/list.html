@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Members | IYDP Admin</title>
+    {% include 'admin/partials/head_assets.html' %}
+</head>
+<body class="antialiased p-3 lg:p-6">
+
+    <div class="flex flex-col lg:flex-row min-h-screen gap-6">
+        {% include 'admin/partials/sidebar.html' %}
+        <main class="flex-1 lg:pr-4">
+            <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 px-4">
+                <div>
+                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">Members</h2>
+                    <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">Found {{ members.total }} members in total</p>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="px-4 mb-6 space-y-2">
+                    {% for category, message in messages %}
+                    <div class="rounded-2xl px-6 py-4 text-sm font-bold {{ 'bg-green-50 text-green-600 border border-green-100' if category == 'success' else 'bg-red-50 text-red-600 border border-red-100' if category in ['danger', 'error'] else 'bg-blue-50 text-blue-600 border border-blue-100' }}">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="rounded-panel overflow-hidden shadow-sm">
+                <div class="px-8 py-6 border-b border-slate-50 bg-slate-50/30 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        {% for key, label in [('', 'All'), ('active', 'VIP'), ('pending', 'Pending'), ('none', 'Regular')] %}
+                        <a href="{{ url_for('list_members', vip=key, search=search) }}" class="px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest {{ 'bg-[#6f3d90] text-white' if vip_filter == key else 'bg-slate-100 text-slate-500 hover:bg-slate-200' }}">{{ label }}</a>
+                        {% endfor %}
+                    </div>
+                    <form action="{{ url_for('list_members') }}" method="get" class="relative w-full md:w-80">
+                        <input type="hidden" name="vip" value="{{ vip_filter }}">
+                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" name="search" value="{{ search or '' }}" class="search-input" placeholder="Search name, email, phone...">
+                    </form>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">
+                                <th class="px-8 py-5">Member</th>
+                                <th class="px-8 py-5">Contact</th>
+                                <th class="px-8 py-5 text-center">Status</th>
+                                <th class="px-8 py-5 text-right">Operations</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            {% for member in members.items %}
+                            <tr class="hover:bg-slate-50/80 transition-all group">
+                                <td class="px-8 py-6">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-11 h-11 shrink-0 rounded-2xl bg-blue-50 text-[#00aef6] flex items-center justify-center border border-blue-100 font-black">
+                                            {{ (member.full_name or member.username)[0]|upper }}
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="text-sm font-black text-slate-900">{{ member.full_name or '—' }}</div>
+                                            <div class="text-[10px] font-bold text-slate-400 uppercase">{{ member.membership_no or 'No membership no.' }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-8 py-6">
+                                    <div class="text-xs font-bold text-slate-700">{{ member.email or '—' }}</div>
+                                    <div class="text-[10px] text-slate-400">{{ member.phone or '' }}</div>
+                                </td>
+                                <td class="px-8 py-6 text-center">
+                                    {% if member.vip_status == 'active' %}
+                                    <span class="status-pill bg-purple-50 text-[#6f3d90] border-purple-100"><i class="fas fa-crown mr-1"></i> VIP</span>
+                                    {% elif member.vip_status == 'pending' %}
+                                    <span class="status-pill bg-yellow-50 text-yellow-500 border-yellow-100">Pending</span>
+                                    {% else %}
+                                    <span class="status-pill bg-slate-100 text-slate-400 border-slate-200">Regular</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-8 py-6 text-right">
+                                    <a href="{{ url_for('view_member', id=member.id) }}" class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 text-white hover:bg-[#6f3d90] transition-all">
+                                        <i class="fas fa-chevron-right text-xs"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No members found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if members.pages > 1 %}
+                <div class="px-8 py-6 border-t border-slate-50 flex justify-center gap-2 bg-slate-50/20">
+                    {% for p in members.iter_pages(left_edge=1, left_current=1, right_current=2, right_edge=1) %}
+                        {% if p %}
+                            <a href="{{ url_for('list_members', page=p, search=search, vip=vip_filter) }}" class="w-8 h-8 flex items-center justify-center rounded-full text-[11px] font-black transition-all {{ 'bg-[#6f3d90] text-white' if p == members.page else 'text-slate-500 hover:text-[#6f3d90]' }}">{{ p }}</a>
+                        {% else %}
+                            <span class="text-slate-300 px-1 text-xs">...</span>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

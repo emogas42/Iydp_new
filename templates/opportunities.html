@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IYDP | Opportunities</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        html { font-size: 100%; }
+        @keyframes word-enter {
+            from { opacity: 0; transform: translateY(10px); filter: blur(2px); }
+            to   { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+        .word-swap-enter { animation: word-enter 350ms ease; }
+    </style>
+</head>
+<body class="bg-white text-slate-800 antialiased font-sans">
+{% include 'partials/public_header.html' %}
+
+<!-- Hero -->
+<section class="relative min-h-[56vh] flex items-center overflow-hidden bg-[#f4fbff] pt-20 pb-16">
+    <div class="absolute inset-0 z-0">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(0,174,246,0.16),transparent_42%)]"></div>
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_85%_75%,rgba(125,186,78,0.14),transparent_40%)]"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-[#f7fcff] via-[#edf7ff] to-[#f8fbff]"></div>
+    </div>
+    <div class="relative max-w-[1280px] mx-auto px-5 lg:px-8 w-full z-10 text-center">
+        <h1 class="text-4xl md:text-6xl lg:text-7xl font-black text-[#0f172a] mb-6 leading-[1.05] tracking-tight text-center">
+            EXPLORE YOUR
+            <span class="block w-full text-center">
+                <span class="inline-block text-[#00aef6]">FUTURE</span> <span class="inline-block text-[#7dba4e]">PATH</span>
+            </span>
+        </h1>
+        <p class="mx-auto max-w-3xl text-lg md:text-xl text-slate-600 font-semibold leading-relaxed px-2 py-2">
+            We provide opportunities in trainings,
+            <span id="opportunityWord" class="inline-flex min-w-[10ch] justify-center font-black text-white bg-[#00aef6] rounded-full px-3 py-1 word-swap-enter">exchanges</span>,
+            and many more.
+        </p>
+    </div>
+</section>
+
+<!-- Filter bar -->
+<section class="py-8 bg-[#f8fafc] relative z-30">
+    <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+        <form action="{{ url_for('opportunities') }}" method="GET" id="filterForm" class="bg-white p-5 md:p-6 rounded-[2rem] shadow-xl shadow-slate-200/60 border border-slate-100 -mt-16">
+            <div class="flex flex-col gap-4">
+                <!-- Row 1: search + sort + submit -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="md:col-span-2 relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" name="search" value="{{ search_query or '' }}"
+                               placeholder="Search by name or country..."
+                               class="w-full pl-14 pr-4 py-4 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-[#00aef6]/50 focus:bg-white transition-all font-medium text-slate-700 shadow-sm">
+                    </div>
+                    <div class="relative">
+                        <select name="sort" onchange="this.form.submit()"
+                                class="w-full px-5 py-4 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-[#00aef6]/50 focus:bg-white font-bold text-slate-600 appearance-none cursor-pointer shadow-sm">
+                            <option value="newest" {{ 'selected' if current_sort == 'newest' }}>Newest First</option>
+                            <option value="alphabetical" {{ 'selected' if current_sort == 'alphabetical' }}>Alphabetical (A-Z)</option>
+                            <option value="deadline_soon" {{ 'selected' if current_sort == 'deadline_soon' }}>Closing Soon</option>
+                        </select>
+                        <i class="fa-solid fa-arrow-down-z-a absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
+                    <button type="submit" class="bg-[#0f172a] text-white font-bold py-4 rounded-xl hover:bg-[#00aef6] transition-all duration-300 uppercase tracking-widest text-xs shadow-md">
+                        Apply Filter
+                    </button>
+                </div>
+
+                <!-- Row 2: Status filters -->
+                <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-50">
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-1">Filter by:</span>
+                    <a href="{{ url_for('opportunities', search=search_query, sort=current_sort, status='active') }}"
+                       class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all {{ 'bg-[#7dba4e] text-white' if current_status == 'active' else 'bg-slate-50 text-slate-500 hover:bg-[#7dba4e]/10 hover:text-[#7dba4e]' }}">
+                        <i class="fa-solid fa-circle-dot text-[8px] mr-1"></i>Active
+                    </a>
+                    <a href="{{ url_for('opportunities', search=search_query, sort=current_sort, status='closed') }}"
+                       class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all {{ 'bg-[#f06e60] text-white' if current_status == 'closed' else 'bg-slate-50 text-slate-500 hover:bg-[#f06e60]/10 hover:text-[#f06e60]' }}">
+                        <i class="fa-solid fa-lock text-[8px] mr-1"></i>Closed
+                    </a>
+                    <a href="{{ url_for('opportunities', search=search_query, sort=current_sort, duration='short') }}"
+                       class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all {{ 'bg-[#00aef6] text-white' if current_duration == 'short' else 'bg-slate-50 text-slate-500 hover:bg-[#00aef6]/10 hover:text-[#00aef6]' }}">
+                        <i class="fa-regular fa-clock text-[8px] mr-1"></i>Short-term
+                    </a>
+                    <a href="{{ url_for('opportunities', search=search_query, sort=current_sort, duration='long') }}"
+                       class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all {{ 'bg-[#6f3d90] text-white' if current_duration == 'long' else 'bg-slate-50 text-slate-500 hover:bg-[#6f3d90]/10 hover:text-[#6f3d90]' }}">
+                        <i class="fa-solid fa-calendar-days text-[8px] mr-1"></i>Long-term
+                    </a>
+                    {% if search_query or current_sort != 'newest' or current_status or current_duration %}
+                    <a href="{{ url_for('opportunities') }}"
+                       class="ml-auto text-[10px] font-black text-[#f06e60] uppercase tracking-[0.15em] flex items-center gap-2 bg-[#f06e60]/10 px-3 py-1.5 rounded-lg hover:bg-[#f06e60]/20 transition">
+                        <i class="fa-solid fa-filter-circle-xmark"></i> Clear All
+                    </a>
+                    {% endif %}
+                </div>
+
+                {% if search_query or current_sort != 'newest' %}
+                <div class="flex items-center gap-2 px-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#7dba4e]"></span>
+                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        Found {{ opportunities|length }} results
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</section>
+
+<!-- Grid -->
+<section class="pb-24 bg-[#f8fafc]">
+    <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {% for opp in opportunities %}
+            <div class="group relative bg-white rounded-[2rem] border border-slate-100 flex flex-col h-full cursor-pointer transition-all duration-300 hover:shadow-xl hover:border-[#00aef6]/20">
+                <a href="{{ url_for('view_opportunity', id=opp.id) }}" class="absolute inset-0 z-20"></a>
+                <div class="p-8 flex flex-col h-full relative z-10">
+                    <div class="flex justify-between items-start mb-6">
+                        <span class="px-3 py-1 bg-white border border-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm">
+                            {{ opp.location or 'Global' }}
+                        </span>
+                        {% if opp.is_closed %}
+                        <span class="px-2 py-1 bg-[#f06e60]/10 text-[#f06e60] rounded-lg text-[9px] font-black uppercase tracking-wider">Closed</span>
+                        {% else %}
+                        <span class="px-2 py-1 bg-[#7dba4e]/10 text-[#7dba4e] rounded-lg text-[9px] font-black uppercase tracking-wider">Active</span>
+                        {% endif %}
+                    </div>
+                    {% if opp.keyword_image %}
+                    <img src="{{ url_for('static', filename='esc/' ~ opp.keyword_image) }}" alt="{{ opp.title }}" class="w-full object-cover rounded-xl mb-4">
+                    {% endif %}
+                    <h3 class="font-bold text-[#0f172a] leading-tight group-hover:text-[#00aef6] transition-colors duration-200 text-xl line-clamp-2 mb-4">
+                        {{ opp.title }}
+                    </h3>
+                    <p class="text-slate-500 text-sm leading-relaxed line-clamp-3 mb-8">
+                        {{ opp.description|striptags }}
+                    </p>
+                    <div class="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
+                        <div>
+                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Application Deadline</span>
+                            <span class="text-xs font-bold text-slate-700">
+                                <i class="fa-regular fa-calendar-check mr-1 text-[#00aef6]"></i>
+                                {{ opp.deadline.strftime('%d %b, %Y') if opp.deadline else 'Open' }}
+                            </span>
+                        </div>
+                        <div class="text-[#00aef6] font-black text-[11px] uppercase tracking-wider flex items-center gap-1 group-hover:gap-2 transition-all">
+                            Details <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-span-full text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-100">
+                <i class="fa-regular fa-face-frown text-4xl text-slate-300 mb-4"></i>
+                <h3 class="text-xl font-bold text-[#0f172a]">No matches found</h3>
+                <p class="text-slate-500 text-sm">Try searching for a different keyword or clear your filters.</p>
+            </div>
+            {% endfor %}
+
+            {% if pagination and pagination.pages > 1 %}
+            <div class="col-span-full mt-12 flex justify-center">
+                <nav class="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+                    {% if pagination.has_prev %}
+                        <a href="{{ url_for('opportunities', page=pagination.prev_num, search=search_query, sort=current_sort) }}"
+                           class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-[#00aef6] hover:text-white transition-all">
+                            <i class="fas fa-chevron-left text-xs"></i>
+                        </a>
+                    {% endif %}
+                    {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                                <a href="{{ url_for('opportunities', page=page_num, search=search_query, sort=current_sort) }}"
+                                   class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-[#00aef6] hover:text-white transition-all font-bold text-sm">{{ page_num }}</a>
+                            {% else %}
+                                <span class="w-12 h-12 flex items-center justify-center rounded-xl bg-[#00aef6] text-white font-bold text-sm">{{ page_num }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="px-2 text-slate-400">...</span>
+                        {% endif %}
+                    {% endfor %}
+                    {% if pagination.has_next %}
+                        <a href="{{ url_for('opportunities', page=pagination.next_num, search=search_query, sort=current_sort) }}"
+                           class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-[#00aef6] hover:text-white transition-all">
+                            <i class="fas fa-chevron-right text-xs"></i>
+                        </a>
+                    {% endif %}
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<script>
+(function rotateOpportunityWord() {
+    const wordEl = document.getElementById('opportunityWord');
+    if (!wordEl) return;
+    const words = [
+        { text: 'exchanges', bg: '#00aef6' },
+        { text: 'volunteering', bg: '#f06e60' },
+        { text: 'seminars', bg: '#7dba4e' }
+    ];
+    let index = 0;
+    function applyWord(w) {
+        wordEl.textContent = w.text;
+        wordEl.style.backgroundColor = w.bg;
+    }
+    applyWord(words[index]);
+    setInterval(() => {
+        index = (index + 1) % words.length;
+        wordEl.classList.remove('word-swap-enter');
+        void wordEl.offsetWidth;
+        applyWord(words[index]);
+        wordEl.classList.add('word-swap-enter');
+    }, 3000);
+})();
+</script>
+
+{% include 'partials/public_footer.html' %}
+</body>
+</html>

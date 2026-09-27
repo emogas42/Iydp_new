@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IYDP | Blog</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        html { font-size: 100%; }
+    </style>
+</head>
+<body class="bg-white text-slate-800 antialiased font-sans">
+{% include 'partials/public_header.html' %}
+
+<section class="relative min-h-[56vh] flex items-center overflow-hidden bg-[#f4fbff] pt-20 pb-16">
+    <div class="absolute inset-0 z-0">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(0,174,246,0.16),transparent_42%)]"></div>
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_85%_75%,rgba(125,186,78,0.14),transparent_40%)]"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-[#f7fcff] via-[#edf7ff] to-[#f8fbff]"></div>
+    </div>
+    <div class="relative max-w-[1280px] mx-auto px-5 lg:px-8 w-full z-10 text-center">
+        <h1 class="text-4xl md:text-6xl lg:text-7xl font-black text-[#0f172a] mb-8 leading-[1.05] tracking-tight text-center">
+            YOUTH
+            <span class="block w-full text-center text-transparent bg-clip-text bg-gradient-to-r from-[#6f3d90] to-[#00aef6]">BLOG</span>
+        </h1>
+        <p class="mx-auto max-w-3xl text-lg md:text-xl text-slate-600 font-semibold leading-relaxed px-2 py-2">
+            Explore articles, personal experiences, and thought-provoking stories from our global community.
+        </p>
+    </div>
+</section>
+
+<section class="py-8 bg-[#f8fafc] relative z-30">
+    <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+        <form action="{{ url_for('blog') }}" method="GET" id="filterForm" class="bg-white p-5 md:p-6 rounded-[2rem] shadow-xl shadow-slate-200/60 border border-slate-100 -mt-16">
+            <div class="flex flex-col gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="md:col-span-2 relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" name="search" value="{{ search or '' }}"
+                               placeholder="Search for articles..."
+                               class="w-full pl-14 pr-4 py-4 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-[#6f3d90]/50 focus:bg-white transition-all font-medium text-slate-700 shadow-sm">
+                    </div>
+                    <div class="relative">
+                        <select name="sort" onchange="this.form.submit()"
+                                class="w-full px-5 py-4 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-[#6f3d90]/50 focus:bg-white font-bold text-slate-600 appearance-none cursor-pointer shadow-sm">
+                            <option value="newest" {{ 'selected' if current_sort == 'newest' }}>Newest First</option>
+                            <option value="alphabetical" {{ 'selected' if current_sort == 'alphabetical' }}>Alphabetical (A-Z)</option>
+                            <option value="oldest" {{ 'selected' if current_sort == 'oldest' }}>Oldest First</option>
+                        </select>
+                        <i class="fa-solid fa-arrow-down-wide-short absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
+                    <button type="submit" class="bg-[#0f172a] text-white font-bold py-4 rounded-xl hover:bg-[#6f3d90] transition-all duration-300 uppercase tracking-widest text-xs shadow-md">
+                        Find Stories
+                    </button>
+                </div>
+                {% if search or current_sort != 'newest' %}
+                <div class="flex items-center justify-between px-2 pt-2 border-t border-slate-50 mt-2">
+                    <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#7dba4e]"></span>
+                        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Found {{ posts.total }} results</p>
+                    </div>
+                    <a href="{{ url_for('blog') }}" class="text-[10px] font-black text-[#f06e60] uppercase tracking-[0.15em] flex items-center gap-2 bg-[#f06e60]/10 px-3 py-1.5 rounded-lg">
+                        <i class="fa-solid fa-filter-circle-xmark"></i> Clear All Filters
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</section>
+
+<section class="pb-24 bg-[#f8fafc]">
+    <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {% for post in posts.items %}
+            <div class="group relative bg-white rounded-[2.5rem] border border-slate-100 flex flex-col h-full cursor-pointer transition-all duration-500 hover:shadow-2xl hover:shadow-slate-200/60 hover:-translate-y-2 overflow-hidden">
+                <a href="{{ url_for('blog_post', slug=post.slug) }}" class="absolute inset-0 z-20"></a>
+                <div class="relative h-64 overflow-hidden">
+                    {% if post.image_url %}
+                        <img src="{{ post.image_url }}" alt="{{ post.title }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">
+                    {% else %}
+                        <div class="w-full h-full bg-slate-100 flex items-center justify-center">
+                            <i class="fa-solid fa-feather-pointed text-slate-300 text-4xl"></i>
+                        </div>
+                    {% endif %}
+                    <div class="absolute top-5 left-5 z-10">
+                        <div class="bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-sm">
+                            <span class="text-[10px] font-black text-[#6f3d90] uppercase tracking-widest">{{ post.created_at.strftime('%d %b') }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-8 flex flex-col h-full relative">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-2 h-2 rounded-full bg-[#6f3d90]"></span>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Platform Stories</span>
+                    </div>
+                    <h3 class="font-bold text-[#0f172a] leading-tight group-hover:text-[#6f3d90] transition-colors duration-300 text-xl line-clamp-2 mb-4">
+                        {{ post.title }}
+                    </h3>
+                    <p class="text-slate-500 text-sm leading-relaxed line-clamp-3 mb-8">
+                        {{ post.content|striptags }}
+                    </p>
+                    <div class="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center">
+                                    <i class="fa-regular fa-calendar text-[#6f3d90] text-[10px]"></i>
+                                </div>
+                                <span class="text-xs font-bold text-slate-600">{{ post.created_at.strftime('%Y') }}</span>
+                            </div>
+                            <div class="flex items-center gap-2 border-l border-slate-100 pl-4">
+                                <i class="fa-regular fa-eye text-slate-400 text-[10px]"></i>
+                                <span class="text-xs font-bold text-slate-400">{{ post.view_count }}</span>
+                            </div>
+                        </div>
+                        <div class="text-[#6f3d90] font-black text-[11px] uppercase tracking-wider flex items-center gap-1 group-hover:gap-3 transition-all">
+                            Read Story <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if posts.pages > 1 %}
+        <div class="mt-16 flex justify-center">
+            <nav class="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+                {% if posts.has_prev %}
+                    <a href="{{ url_for('blog', page=posts.prev_num, search=search) }}"
+                       class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-[#6f3d90] hover:text-white transition-all">
+                        <i class="fas fa-chevron-left text-xs"></i>
+                    </a>
+                {% endif %}
+                {% for page_num in posts.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                    {% if page_num %}
+                        {% if page_num != posts.page %}
+                            <a href="{{ url_for('blog', page=page_num, search=search) }}"
+                               class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-[#6f3d90] hover:text-white transition-all font-bold text-sm">{{ page_num }}</a>
+                        {% else %}
+                            <span class="w-12 h-12 flex items-center justify-center rounded-xl bg-[#6f3d90] text-white font-bold text-sm">{{ page_num }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="px-2 text-slate-400">...</span>
+                    {% endif %}
+                {% endfor %}
+                {% if posts.has_next %}
+                    <a href="{{ url_for('blog', page=posts.next_num, search=search) }}"
+                       class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-[#6f3d90] hover:text-white transition-all">
+                        <i class="fas fa-chevron-right text-xs"></i>
+                    </a>
+                {% endif %}
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+{% include 'partials/public_footer.html' %}
+</body>
+</html>

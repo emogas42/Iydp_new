@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ event.name }} — İştirak | IYDP Admin</title>
+    {% include 'admin/partials/head_assets.html' %}
+</head>
+<body class="antialiased p-3 lg:p-6">
+
+    <div class="flex flex-col lg:flex-row min-h-screen gap-6">
+        {% include 'admin/partials/sidebar.html' %}
+        <main class="flex-1 lg:pr-4">
+            <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6 px-4">
+                <div>
+                    <a href="{{ url_for('list_events') }}" class="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-[#6f3d90]"><i class="fas fa-arrow-left mr-2"></i>Tədbirlərə qayıt</a>
+                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase mt-2">{{ event.name }}</h2>
+                    <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">{{ event.starts_at|az_time('%d %b, %Y %H:%M') if event.starts_at else '' }} {{ '· ' ~ event.location if event.location }}</p>
+                </div>
+                <div class="flex gap-3">
+                    <a href="{{ url_for('export_event_attendance', id=event.id) }}" class="btn-cancel px-6 py-3 text-[10px]"><i class="fas fa-file-csv mr-2"></i> CSV Export</a>
+                    <a href="{{ url_for('scanner') }}" class="btn-action px-6 py-3 text-[10px]"><i class="fas fa-qrcode mr-2"></i> Scanner Aç</a>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10 px-4">
+                <div class="rounded-panel stat-card p-8" style="border-bottom-color: var(--iydp-blue);">
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Qeydə Alınanlar</p>
+                    <h3 class="text-5xl font-black text-slate-900 tracking-tighter">{{ attendances|length }}</h3>
+                </div>
+                <div class="rounded-panel stat-card p-8" style="border-bottom-color: var(--iydp-purple);">
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Ümumi Aktiv VIP</p>
+                    <h3 class="text-5xl font-black text-slate-900 tracking-tighter">{{ total_vip }}</h3>
+                </div>
+                <div class="rounded-panel stat-card p-8" style="border-bottom-color: var(--iydp-green);">
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">İştirak Faizi</p>
+                    <h3 class="text-5xl font-black text-slate-900 tracking-tighter">{{ ((attendances|length / total_vip * 100) if total_vip else 0)|round(0, 'floor')|int }}%</h3>
+                </div>
+            </div>
+
+            <div class="rounded-panel overflow-hidden shadow-sm mx-4">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">
+                                <th class="px-8 py-5">Üzv</th>
+                                <th class="px-8 py-5">Membership No.</th>
+                                <th class="px-8 py-5">Giriş vaxtı</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            {% for a in attendances %}
+                            <tr class="hover:bg-slate-50/80 transition-all">
+                                <td class="px-8 py-5">
+                                    <div class="text-sm font-black text-slate-900">{{ a.user.full_name or a.user.username }}</div>
+                                    <div class="text-[10px] text-slate-400">{{ a.user.email or '' }}</div>
+                                </td>
+                                <td class="px-8 py-5 text-xs font-bold text-slate-500">{{ a.user.membership_no or '—' }}</td>
+                                <td class="px-8 py-5 text-xs font-bold text-slate-500">{{ a.checked_in_at|az_time if a.checked_in_at else '—' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Hələ heç kim qeydə alınmayıb</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

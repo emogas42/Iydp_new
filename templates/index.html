@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IYDP | International Youth Dialogue Platform</title>
+    <meta name="description" content="IYDP empowers young people through international projects, Erasmus+, ESC, study abroad and cross-cultural collaboration.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        html { font-size: 100%; }
+        * { font-family: 'Plus Jakarta Sans', sans-serif; }
+        h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; }
+
+        .fade-up { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+        .fade-up.show { opacity: 1; transform: translateY(0); }
+
+        /* ── Stat color cycle ── */
+        @keyframes stat-color-cycle {
+            0%   { color: #00aef6; }
+            25%  { color: #7dba4e; }
+            50%  { color: #f06e60; }
+            75%  { color: #6f3d90; }
+            100% { color: #00aef6; }
+        }
+        .stat-circulate { animation: stat-color-cycle 7s linear infinite; }
+
+        /* ── Counting animation ── */
+        @keyframes countUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .count-anim { animation: countUp 0.6s ease forwards; }
+
+        /* ── Stories tab ── */
+        .story-tab { transition: all 0.25s ease; }
+        .story-tab.active { background: #0f172a; color: #fff; }
+
+        /* ── FAQ ── */
+        #faq { background: linear-gradient(180deg, #f7fbff 0%, #ffffff 48%, #f6fcf8 100%); }
+        .faq-item {
+            background: rgba(255,255,255,0.95);
+            border: 1px solid #e2e8f0;
+            border-left-width: 4px;
+            border-radius: 1rem;
+            box-shadow: 0 4px 16px rgba(15,23,42,0.04);
+            transition: all 0.25s ease;
+            overflow: hidden;
+        }
+        .faq-item:hover { box-shadow: 0 8px 24px rgba(15,23,42,0.08); }
+        .faq-item:nth-child(4n+1) { border-left-color: #00aef6; }
+        .faq-item:nth-child(4n+2) { border-left-color: #f06e60; }
+        .faq-item:nth-child(4n+3) { border-left-color: #7dba4e; }
+        .faq-item:nth-child(4n+4) { border-left-color: #6f3d90; }
+        .faq-icon { transition: transform 0.35s ease; }
+        .faq-item[data-open="true"] .faq-icon { transform: rotate(180deg); }
+        .faq-body { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.36s ease, opacity 0.28s ease; }
+        .faq-item[data-open="true"] .faq-body { opacity: 1; }
+
+        /* ── Marquee ── */
+        @keyframes scroll-left { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        .marquee-inner { display: flex; width: max-content; animation: scroll-left 35s linear infinite; }
+        .marquee-inner:hover { animation-play-state: paused; }
+
+        /* ── Objective cards ── */
+        .obj-card {
+            position: relative;
+            padding: 1.5rem;
+            border-radius: 1.25rem;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            transition: all 0.3s ease;
+        }
+        .obj-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(15,23,42,0.08); }
+        .obj-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 1.25rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .obj-card:hover::before { opacity: 1; }
+
+        /* ── Story card ── */
+        .story-card { transition: all 0.4s ease; }
+        .story-card:hover { transform: translateY(-4px); box-shadow: 0 20px 48px rgba(15,23,42,0.12); }
+    </style>
+</head>
+
+<body class="bg-white text-slate-800 antialiased font-sans">
+
+    {% include 'partials/public_header.html' %}
+
+    <!-- ── HERO (full-bleed photo bg) ── -->
+    <section class="relative min-h-[72vh] overflow-hidden">
+        <!-- Background image -->
+        <div class="absolute inset-0">
+            <img src="{{ url_for('static', filename='IYDP_members.jpeg') }}" alt="IYDP youth" class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-gradient-to-r from-[#0f172a]/35 via-[#0f172a]/20 to-transparent"></div>
+        </div>
+    </section>
+
+    <section class="bg-white py-14 lg:py-16 border-b border-slate-100">
+        <div class="max-w-[1280px] mx-auto px-5 lg:px-8 w-full">
+            <div class="max-w-3xl">
+                <div class="inline-flex items-center gap-2 bg-[#7dba4e]/10 border border-[#7dba4e]/30 rounded-full px-4 py-1.5 mb-6">
+                    <span class="w-2 h-2 rounded-full bg-[#7dba4e] animate-pulse"></span>
+                    <span class="text-[#7dba4e] text-xs font-semibold tracking-widest">Youth-Led Future Starts Here</span>
+                </div>
+
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] tracking-tight mb-6">
+                    Connecting and<br>
+                    <span class="text-[#00aef6]">empowering youth</span><br>
+                    internationally
+                </h1>
+
+                <p class="text-slate-600 text-base lg:text-lg leading-relaxed max-w-2xl mb-8">
+                    IYDP connects young people to international projects, Erasmus+ programs, study abroad opportunities and cross-cultural collaboration.
+                </p>
+
+                <div class="flex flex-wrap gap-3">
+                    <a href="#programs" class="bg-[#00aef6] text-white px-7 py-3 rounded-xl font-semibold text-sm hover:bg-[#0098d4] transition inline-flex items-center gap-2">
+                        Explore programs <i class="fa-solid fa-arrow-right text-xs"></i>
+                    </a>
+                    <a href="#join" class="border border-slate-300 text-slate-800 px-7 py-3 rounded-xl font-semibold text-sm hover:bg-slate-900 hover:text-white transition">
+                        Join Us
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── STATS (separate section) ── -->
+    <section class="bg-[#0f172a] py-16">
+        <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-8 text-center">
+                <div class="fade-up">
+                    <p class="text-5xl font-bold text-white tracking-tight mb-2">
+                        <span class="stat-circulate stat-count" data-target="5000" data-suffix="+">0</span>
+                    </p>
+                    <p class="text-slate-400 text-sm leading-snug">Youth served annually</p>
+                    <div class="w-12 h-0.5 bg-[#00aef6]/40 mx-auto mt-4"></div>
+                </div>
+                <div class="fade-up" style="transition-delay:0.15s">
+                    <p class="text-5xl font-bold text-white tracking-tight mb-2">
+                        <span class="stat-circulate stat-count" style="animation-delay:-1.7s;" data-target="300" data-suffix="+">0</span>
+                    </p>
+                    <p class="text-slate-400 text-sm leading-snug">Join global programs yearly</p>
+                    <div class="w-12 h-0.5 bg-[#7dba4e]/40 mx-auto mt-4"></div>
+                </div>
+                <div class="fade-up" style="transition-delay:0.3s">
+                    <p class="text-5xl font-bold text-white tracking-tight mb-2">
+                        <span class="stat-circulate stat-count" style="animation-delay:-3.4s;" data-target="30" data-suffix="+">0</span>
+                    </p>
+                    <p class="text-slate-400 text-sm leading-snug">Currently in IYDP-supported experiences</p>
+                    <div class="w-12 h-0.5 bg-[#f06e60]/40 mx-auto mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── ABOUT ── -->
+    <section id="about" class="py-20 lg:py-28 bg-white">
+        <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+            <div class="max-w-2xl mb-14 fade-up">
+                <p class="text-[#6f3d90] text-sm font-semibold mb-2">About us</p>
+                <h2 class="text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight">
+                    About IYDP
+                </h2>
+            </div>
+
+            <div class="grid lg:grid-cols-5 gap-10 mb-16 fade-up">
+                <div class="lg:col-span-3 space-y-4">
+                    <p class="text-slate-600 leading-relaxed">
+                        The <strong class="text-slate-900">International Youth Dialogue Platform (IYDP)</strong> is a Public Union founded in Baku, Azerbaijan, in 2019. The organization is committed to empowering young people through international experiences, non-formal education, and opportunities for personal and professional growth. By promoting intercultural dialogue, volunteering, and youth mobility, IYDP supports the development of active and globally engaged citizens.
+                    </p>
+                    <p class="text-slate-600 leading-relaxed">
+                        IYDP actively participates in international programs such as Erasmus+ and the European Solidarity Corps (ESC), fostering collaboration, learning, and solidarity among youth. Since 2020, the organization has held the ESC Quality Label, ensuring high-quality volunteering and educational opportunities that contribute to youth development and cross-cultural exchange.
+                    </p>
+                    <p class="text-slate-600 leading-relaxed">
+                        Through its initiatives, IYDP promotes intercultural understanding, leadership, and employability, while building strong international partnerships. The organization implements both local and international projects that encourage dialogue, innovation, and sustainable development, supporting young people in gaining essential skills and global perspectives.
+                    </p>
+                    <p class="text-slate-600 leading-relaxed">
+                        With a focus on youth development, education, environmental sustainability, and social inclusion, IYDP continues to create impactful opportunities for young people-helping them grow, connect, and contribute to a more inclusive and peaceful world.
+                    </p>
+                </div>
+                <div class="lg:col-span-2">
+                    <img src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=600"
+                        alt="Students collaborating" class="rounded-2xl w-full h-72 object-cover">
+                </div>
+            </div>
+
+            <!-- Key Objectives – creative cards, no numbers -->
+            <div id="mission" class="fade-up">
+                <h3 class="text-2xl font-bold text-slate-900 mb-8">Key Objectives</h3>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div class="obj-card group">
+                        <div class="w-10 h-10 rounded-xl bg-[#00aef6]/10 text-[#00aef6] flex items-center justify-center mb-4 group-hover:bg-[#00aef6] group-hover:text-white transition-all">
+                            <i class="fa-solid fa-earth-europe"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700 leading-relaxed">Increase opportunities for youth to participate in international projects and programs.</p>
+                    </div>
+                    <div class="obj-card group">
+                        <div class="w-10 h-10 rounded-xl bg-[#6f3d90]/10 text-[#6f3d90] flex items-center justify-center mb-4 group-hover:bg-[#6f3d90] group-hover:text-white transition-all">
+                            <i class="fa-solid fa-comments"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700 leading-relaxed">Implement initiatives that promote intercultural dialogue and cooperation.</p>
+                    </div>
+                    <div class="obj-card group">
+                        <div class="w-10 h-10 rounded-xl bg-[#7dba4e]/10 text-[#7dba4e] flex items-center justify-center mb-4 group-hover:bg-[#7dba4e] group-hover:text-white transition-all">
+                            <i class="fa-solid fa-seedling"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700 leading-relaxed">Develop youth as active and responsible individuals capable of responding to global challenges.</p>
+                    </div>
+                    <div class="obj-card group">
+                        <div class="w-10 h-10 rounded-xl bg-[#f06e60]/10 text-[#f06e60] flex items-center justify-center mb-4 group-hover:bg-[#f06e60] group-hover:text-white transition-all">
+                            <i class="fa-solid fa-book-open"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700 leading-relaxed">Support knowledge and skills development through non-formal education methods.</p>
+                    </div>
+                    <div class="obj-card group sm:col-span-2">
+                        <div class="w-10 h-10 rounded-xl bg-[#00aef6]/10 text-[#00aef6] flex items-center justify-center mb-4 group-hover:bg-[#00aef6] group-hover:text-white transition-all">
+                            <i class="fa-solid fa-handshake"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700 leading-relaxed">Increase social integration of youth and support their role as active representatives of Azerbaijan in the international arena.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── ESC SECTION ── -->
+    <section id="esc" class="py-20 bg-slate-50 border-y border-slate-100">
+        <div class="max-w-[1280px] mx-auto px-5 lg:px-8 fade-up">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <div>
+                    <p class="text-[#00aef6] text-sm font-semibold mb-2">Erasmus+ & ESC</p>
+                    <h2 class="text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight mb-5">European Solidarity Corps</h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">IYDP is an accredited sending and hosting organization under the European Solidarity Corps program, holding the ESC Quality Label since 2020. This recognition ensures our volunteering and youth exchange activities meet the highest European standards.</p>
+                    <p class="text-slate-600 leading-relaxed mb-6">Through Erasmus+, we run youth exchanges, training courses, and capacity-building projects across Europe and beyond — opening doors for Azerbaijani youth to the world.</p>
+                    <a href="{{ url_for('opportunities') }}" class="inline-flex items-center gap-2 bg-[#00aef6] text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-[#0098d4] transition">
+                        View opportunities <i class="fa-solid fa-arrow-right text-xs"></i>
+                    </a>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm text-center">
+                        <div class="w-12 h-12 rounded-xl bg-[#00aef6]/10 text-[#00aef6] flex items-center justify-center mx-auto mb-3 text-xl"><i class="fa-solid fa-star"></i></div>
+                        <p class="font-bold text-slate-900 text-sm">ESC Quality Label</p>
+                        <p class="text-slate-500 text-xs mt-1">Since 2020</p>
+                    </div>
+                    <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm text-center">
+                        <div class="w-12 h-12 rounded-xl bg-[#6f3d90]/10 text-[#6f3d90] flex items-center justify-center mx-auto mb-3 text-xl"><i class="fa-solid fa-globe"></i></div>
+                        <p class="font-bold text-slate-900 text-sm">Erasmus+ Partner</p>
+                        <p class="text-slate-500 text-xs mt-1">Certified</p>
+                    </div>
+                    <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm text-center">
+                        <div class="w-12 h-12 rounded-xl bg-[#7dba4e]/10 text-[#7dba4e] flex items-center justify-center mx-auto mb-3 text-xl"><i class="fa-solid fa-people-group"></i></div>
+                        <p class="font-bold text-slate-900 text-sm">Youth Exchanges</p>
+                        <p class="text-slate-500 text-xs mt-1">EU & Beyond</p>
+                    </div>
+                    <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm text-center">
+                        <div class="w-12 h-12 rounded-xl bg-[#f06e60]/10 text-[#f06e60] flex items-center justify-center mx-auto mb-3 text-xl"><i class="fa-solid fa-certificate"></i></div>
+                        <p class="font-bold text-slate-900 text-sm">Youthpass</p>
+                        <p class="text-slate-500 text-xs mt-1">Recognized certificates</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── PROGRAMS ── -->
+    <section id="programs" class="py-20 lg:py-28 bg-white">
+        <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+            <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10 fade-up">
+                <div>
+                    <p class="text-[#00aef6] text-sm font-semibold mb-1">Opportunities</p>
+                    <h2 class="text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight">Active programs</h2>
+                </div>
+                <a href="{{ url_for('opportunities') }}" class="text-sm font-semibold text-[#00aef6] hover:underline">View all →</a>
+            </div>
+
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 fade-up">
+                {% for opp in opportunities[:6] %}
+                <a href="{{ url_for('view_opportunity', id=opp.id) }}"
+                    class="group block bg-white rounded-xl border border-slate-100 p-6 hover:shadow-md hover:border-slate-200 transition">
+                    {% if opp.keyword_image %}
+                    <div class="mb-4 rounded-lg overflow-hidden border border-slate-100">
+                        <img src="{{ url_for('static', filename='esc/' ~ opp.keyword_image) }}" alt="{{ opp.title }}" class="w-full h-40 object-cover">
+                    </div>
+                    {% else %}
+                    <div class="mb-4 rounded-lg overflow-hidden border border-slate-100 bg-slate-50 h-40 flex items-center justify-center">
+                        <i class="fa-regular fa-image text-2xl text-slate-300"></i>
+                    </div>
+                    {% endif %}
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-medium text-slate-400 bg-slate-50 px-2.5 py-1 rounded">{{ opp.location or 'Remote' }}</span>
+                        <span class="text-xs text-slate-400"><i class="fa-regular fa-eye mr-1"></i>{{ opp.view_count or 0 }}</span>
+                    </div>
+                    <h3 class="font-bold text-slate-900 group-hover:text-[#00aef6] transition leading-snug mb-2 line-clamp-2">{{ opp.title }}</h3>
+                    <p class="text-sm text-slate-500 leading-relaxed line-clamp-3 mb-5">{{ opp.description|striptags }}</p>
+                    <div class="flex items-center justify-between pt-4 border-t border-slate-50">
+                        <div>
+                            <p class="text-[10px] text-slate-400 font-medium uppercase">Deadline</p>
+                            <p class="text-xs font-semibold text-slate-700">{{ opp.deadline.strftime('%d %b, %Y') if opp.deadline else 'Open' }}</p>
+                        </div>
+                        <span class="text-xs font-semibold text-[#00aef6] group-hover:underline">Apply →</span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- ── STORIES (experiences) ── -->
+    <section id="stories" class="py-20 lg:py-28 bg-[#f8fafc]">
+        <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+            <div class="max-w-xl mb-12 fade-up">
+                <p class="text-[#f06e60] text-sm font-semibold mb-2">Real experiences</p>
+                <h2 class="text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight">Stories from our community</h2>
+                <p class="text-slate-500 mt-3 leading-relaxed">Read personal journeys, reflections and insights shared by young people who have participated in IYDP programs.</p>
+            </div>
+
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 fade-up">
+                {% for post in posts[:3] %}
+                <a href="{{ url_for('blog_post', slug=post.slug) }}" class="story-card group block bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                    {% if post.image_url %}
+                    <div class="h-48 overflow-hidden">
+                        <img src="{{ post.image_url }}" alt="{{ post.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                    </div>
+                    {% else %}
+                    <div class="h-48 bg-gradient-to-br from-[#f4fbff] to-[#edf7ff] flex items-center justify-center">
+                        <i class="fa-solid fa-feather-pointed text-3xl text-[#00aef6]/30"></i>
+                    </div>
+                    {% endif %}
+                    <div class="p-6">
+                        <span class="text-[10px] font-black text-[#6f3d90] uppercase tracking-widest">{{ post.created_at.strftime('%d %b %Y') }}</span>
+                        <h3 class="font-bold text-slate-900 group-hover:text-[#6f3d90] transition mt-2 mb-3 line-clamp-2 text-lg">{{ post.title }}</h3>
+                        <p class="text-sm text-slate-500 line-clamp-3">{{ post.content|striptags }}</p>
+                        <div class="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
+                            <span class="text-xs text-slate-400"><i class="fa-regular fa-eye mr-1"></i>{{ post.view_count }}</span>
+                            <span class="text-xs font-bold text-[#6f3d90]">Read story →</span>
+                        </div>
+                    </div>
+                </a>
+                {% else %}
+                <!-- Placeholder cards if no blog posts yet -->
+                <div class="story-card bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                    <div class="h-48 bg-gradient-to-br from-[#f4fbff] to-[#edf7ff] flex items-center justify-center">
+                        <i class="fa-solid fa-pen-nib text-3xl text-[#00aef6]/30"></i>
+                    </div>
+                    <div class="p-6">
+                        <span class="text-[10px] font-black text-[#6f3d90] uppercase tracking-widest">Coming soon</span>
+                        <h3 class="font-bold text-slate-900 mt-2 mb-3 text-lg">Youth Exchange in Europe</h3>
+                        <p class="text-sm text-slate-500">Stories from our participants will appear here soon. Check back for inspiring journeys!</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="text-center mt-10 fade-up">
+                <a href="{{ url_for('blog') }}" class="inline-flex items-center gap-2 border border-slate-200 text-slate-700 px-6 py-3 rounded-xl text-sm font-semibold hover:bg-slate-50 transition">
+                    Read all stories <i class="fa-solid fa-arrow-right text-xs"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── CONTACT ── -->
+    <section id="join" class="py-20 lg:py-28 bg-white">
+        <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+            <div class="grid lg:grid-cols-5 gap-14">
+                <div class="lg:col-span-2 fade-up">
+                    <p class="text-[#7dba4e] text-sm font-semibold mb-2">Contact</p>
+                    <h2 class="text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight mb-6">Let's connect</h2>
+                    <p class="text-slate-500 leading-relaxed mb-8">Reach us for Erasmus+, ESC, partnership and international cooperation inquiries.</p>
+                    <div class="space-y-3 mb-10">
+                        <a href="mailto:info@iydp.org" class="flex items-center gap-4 p-4 rounded-xl border border-slate-100 hover:border-[#7dba4e]/30 transition group">
+                            <span class="w-10 h-10 rounded-lg bg-[#7dba4e]/10 text-[#7dba4e] flex items-center justify-center group-hover:bg-[#7dba4e] group-hover:text-white transition"><i class="fa-solid fa-at"></i></span>
+                            <div>
+                                <p class="text-[10px] uppercase text-slate-400 font-medium tracking-wider">Email</p>
+                                <p class="text-sm font-semibold text-slate-900">info@iydp.org</p>
+                            </div>
+                        </a>
+                        <a href="tel:+994518774115" class="flex items-center gap-4 p-4 rounded-xl border border-slate-100 hover:border-[#7dba4e]/30 transition group">
+                            <span class="w-10 h-10 rounded-lg bg-[#7dba4e]/10 text-[#7dba4e] flex items-center justify-center group-hover:bg-[#7dba4e] group-hover:text-white transition"><i class="fa-solid fa-phone"></i></span>
+                            <div>
+                                <p class="text-[10px] uppercase text-slate-400 font-medium tracking-wider">Phone</p>
+                                <p class="text-sm font-semibold text-slate-900">+994 51 877 41 15</p>
+                            </div>
+                        </a>
+                        <div class="flex items-center gap-4 p-4 rounded-xl border border-slate-100">
+                            <span class="w-10 h-10 rounded-lg bg-[#7dba4e]/10 text-[#7dba4e] flex items-center justify-center"><i class="fa-solid fa-location-dot"></i></span>
+                            <div>
+                                <p class="text-[10px] uppercase text-slate-400 font-medium tracking-wider">Address</p>
+                                <p class="text-sm font-semibold text-slate-900">13th floor, Globus Center<br>609 Jafar Jabbarly Str., Baku</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-3 fade-up">
+                    <div class="bg-slate-50 rounded-2xl p-6 md:p-10 border border-slate-100">
+                        <form id="contactForm" action="{{ url_for('contact') }}" method="POST" class="space-y-5">
+                            <div class="grid sm:grid-cols-2 gap-5">
+                                <div>
+                                    <label class="text-xs font-semibold text-slate-700 mb-1.5 block">Full Name</label>
+                                    <input type="text" name="name" placeholder="John Doe" required class="w-full bg-white border border-slate-200 focus:border-[#00aef6] px-4 py-3 rounded-xl outline-none transition text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs font-semibold text-slate-700 mb-1.5 block">Email</label>
+                                    <input type="email" name="email" placeholder="john@example.com" required class="w-full bg-white border border-slate-200 focus:border-[#00aef6] px-4 py-3 rounded-xl outline-none transition text-sm">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-slate-700 mb-1.5 block">Message</label>
+                                <textarea name="message" rows="5" placeholder="How can we help?" required class="w-full bg-white border border-slate-200 focus:border-[#00aef6] px-4 py-3 rounded-xl outline-none transition text-sm resize-none"></textarea>
+                            </div>
+                            <button type="submit" id="submitBtn" class="w-full bg-[#0f172a] text-white font-semibold py-3.5 rounded-xl hover:bg-[#00aef6] transition text-sm flex items-center justify-center gap-2">
+                                <span>Send message</span>
+                                <i class="fa-solid fa-paper-plane text-xs"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── FAQ ── -->
+    <section id="faq" class="py-20 lg:py-28">
+        <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+            <div class="max-w-xl mb-10 fade-up">
+                <p class="text-[#7dba4e] text-sm font-semibold mb-2">Most asked questions</p>
+                <h2 class="text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight">FAQ</h2>
+            </div>
+            <div class="space-y-3 max-w-4xl fade-up">
+                {% set faqs = [
+                    ("What is Erasmus+?", "Erasmus+ is a program of the European Union that creates international learning and mobility opportunities in the fields of education, youth, and sport. Through this program, young people can participate in projects in different countries, gain new skills, and experience different cultures."),
+                    ("Who can participate in Erasmus+ projects?", "Usually, young people aged 18-30 can participate in Erasmus+ youth projects. However, the age limit may vary depending on the activity, and youth workers can also take part."),
+                    ("Are Erasmus+ projects funded?", "Most Erasmus+ projects are funded by the European Union. Therefore, accommodation, meals, visa, and program costs are usually covered. Travel expenses are reimbursed within a certain limit."),
+                    ("How long do Erasmus+ projects last?", "The duration of projects can vary. Youth exchanges usually last between 5-21 days, while training courses may last approximately 2-60 days."),
+                    ("Is it necessary to know English to participate?", "Most projects are conducted in English. However, a high level of English is not required. A basic level that allows you to communicate is usually sufficient."),
+                    ("What do participants learn in Erasmus+ projects?", "Projects use non-formal education methods. Participants develop skills such as leadership, teamwork, communication, problem-solving, media literacy, and awareness of various social topics."),
+                    ("How can someone apply for Erasmus+ projects?", "Projects can be found and applied for through Erasmus+ platforms, by applying through local youth organizations like IYDP, or by following our social media pages."),
+                    ("Do participants receive a certificate?", "Yes. At the end of the project, participants receive a Youthpass certificate, which recognizes the skills and competencies they gained during the project."),
+                    ("Is it necessary to be a student to participate?", "No. It is not necessary to be a student to participate in Erasmus+ youth projects. The program is open to young people from different backgrounds."),
+                    ("Is a visa required to participate in Erasmus+ projects?", "This depends on the country where the project takes place. If the project is held in the Schengen area, Azerbaijani citizens usually need a Schengen visa. The hosting organization often provides an invitation letter.")
+                ] %}
+                {% for q, a in faqs %}
+                <div class="faq-item" data-open="false">
+                    <button class="faq-trigger flex justify-between items-center w-full text-left font-semibold p-5 text-sm text-slate-800" onclick="toggleFaq(this)">
+                        {{ q }}
+                        <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 faq-icon shrink-0 ml-4"></i>
+                    </button>
+                    <div class="faq-body">
+                        <div class="px-5 pb-5 text-sm text-slate-600 leading-relaxed">{{ a }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- ── FOOTER ── -->
+    {% include 'partials/public_footer.html' %}
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Fade-up observer
+        const observer = new IntersectionObserver(entries => {
+            entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('show'); });
+        }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+        document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+        const statObserver = new IntersectionObserver((entries, obs) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                const el = entry.target;
+                const target = Number(el.dataset.target || 0);
+                const suffix = el.dataset.suffix || '';
+                const duration = 1400;
+                const start = performance.now();
+                const animate = (now) => {
+                    const progress = Math.min((now - start) / duration, 1);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    el.textContent = Math.floor(target * eased).toLocaleString() + suffix;
+                    if (progress < 1) requestAnimationFrame(animate);
+                };
+                requestAnimationFrame(animate);
+                obs.unobserve(el);
+            });
+        }, { threshold: 0.4 });
+        document.querySelectorAll('.stat-count').forEach((el) => statObserver.observe(el));
+    });
+
+    function toggleFaq(btn) {
+        const item = btn.closest('.faq-item');
+        const body = item.querySelector('.faq-body');
+        const isOpen = item.dataset.open === 'true';
+
+        // Close all others
+        document.querySelectorAll('.faq-item[data-open="true"]').forEach(other => {
+            if (other !== item) {
+                other.dataset.open = 'false';
+                other.querySelector('.faq-body').style.maxHeight = '0';
+            }
+        });
+
+        if (isOpen) {
+            item.dataset.open = 'false';
+            body.style.maxHeight = '0';
+        } else {
+            item.dataset.open = 'true';
+            body.style.maxHeight = body.scrollHeight + 'px';
+        }
+    }
+    </script>
+
+    <!-- Contact form AJAX -->
+    <script>
+    document.getElementById('contactForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const form = this, btn = document.getElementById('submitBtn'), data = new FormData(form);
+        btn.disabled = true;
+        btn.querySelector('span').innerText = 'Sending...';
+        btn.querySelector('i').className = 'fa-solid fa-circle-notch fa-spin text-xs';
+        fetch(form.action, { method: 'POST', body: data, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') {
+                    Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 4000, timerProgressBar: true })
+                        .fire({ icon: 'success', title: d.message, background: '#fff', iconColor: '#7dba4e' });
+                    form.reset();
+                } else { Swal.fire({ icon: 'error', title: 'Error', text: d.message, confirmButtonColor: '#0f172a' }); }
+            })
+            .catch(() => { Swal.fire({ icon: 'error', title: 'Oops', text: 'Something went wrong!', confirmButtonColor: '#0f172a' }); })
+            .finally(() => { btn.disabled = false; btn.querySelector('span').innerText = 'Send message'; btn.querySelector('i').className = 'fa-solid fa-paper-plane text-xs'; });
+    });
+    </script>
+</body>
+</html>

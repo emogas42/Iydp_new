@@ -1,0 +1,45 @@
+<footer class="relative min-h-[56vh] flex items-center overflow-hidden bg-[#f4fbff] pt-20 pb-16">
+    <div class="max-w-[1280px] mx-auto px-5 lg:px-8">
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-14">
+            <div>
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="IYDP" class="h-16 w-auto mb-4">
+                <p class="text-slate-500 text-sm leading-relaxed mb-5">The hub for international dialogue and professional youth development.</p>
+                <div class="flex gap-2">
+                    <a href="https://www.instagram.com/iydplatform" class="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-[#6f3d90] hover:text-white hover:border-[#6f3d90] transition text-sm"><i class="fa-brands fa-instagram"></i></a>
+                    <a href="https://www.linkedin.com/company/international-youth-dialogue-platform/" class="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-[#0077b5] hover:text-white hover:border-[#0077b5] transition text-sm"><i class="fa-brands fa-linkedin-in"></i></a>
+                    <a href="https://www.facebook.com/iydplatform" class="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-[#1877f2] hover:text-white hover:border-[#1877f2] transition text-sm"><i class="fa-brands fa-facebook-f text-xs"></i></a>
+                    <a href="https://x.com/iydplatform" class="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-black hover:text-white hover:border-black transition text-sm">
+                        <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>
+                    </a>
+                </div>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-5">Navigate</p>
+                <ul class="space-y-3 text-sm text-slate-500">
+                    <li><a href="{{ url_for('home') }}#about" class="hover:text-slate-900 transition">About IYDP</a></li>
+                    <li><a href="{{ url_for('home') }}#programs" class="hover:text-slate-900 transition">Projects</a></li>
+                    <li><a href="{{ url_for('home') }}#stories" class="hover:text-slate-900 transition">Stories</a></li>
+                    <li><a href="{{ url_for('opportunities') }}" class="hover:text-slate-900 transition">Opportunities</a></li>
+                    <li><a href="{{ url_for('home') }}#faq" class="hover:text-slate-900 transition">FAQ</a></li>
+                </ul>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-5">Support</p>
+                <ul class="space-y-3 text-sm text-slate-500">
+                    <li><a href="#" class="hover:text-slate-900 transition">Privacy Policy</a></li>
+                    <li><a href="#" class="hover:text-slate-900 transition">Terms of Use</a></li>
+                    <li><a href="{{ url_for('home') }}#faq" class="hover:text-slate-900 transition">FAQ</a></li>
+                    <li><a href="{{ url_for('contact') }}" class="hover:text-slate-900 transition">Contact</a></li>
+                </ul>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-5">Report a bug</p>
+                <p class="text-sm text-slate-500 mb-3">Found an issue? Let us know so we can fix it.</p>
+                <a href="mailto:webmaster@iydp.org" class="text-sm text-[#f06e60] font-medium hover:underline">webmaster@iydp.org</a>
+            </div>
+        </div>
+        <div class="pt-8 border-t border-sky-100 text-center">
+            <p class="text-slate-500 text-xs">© 2026 IYDP International. All rights reserved.</p>
+        </div>
+    </div>
+</footer>

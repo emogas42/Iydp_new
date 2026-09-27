@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Environment
+.env
+
+# Database (created automatically on first run / migration)
+instance/*.db
+instance/*.db-journal
+*.sqbpro
+
+# Node / frontend build
+node_modules/
+dist/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Migrations cache
+migrations/**/__pycache__/

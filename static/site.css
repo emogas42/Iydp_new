@@ -1,0 +1,35 @@
+html {
+  font-size: 100%;
+}
+
+body {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  color: #1e293b;
+  background: #ffffff;
+}
+
+.site-nav {
+  background: rgba(244, 251, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+:root {
+  --iydp-primary: #00aef6;
+  --iydp-secondary: #6f3d90;
+  --iydp-accent: #7dba4e;
+  --iydp-warm: #f06e60;
+  --iydp-ink: #0f172a;
+  --iydp-max: 1600px;
+}
+
+a,
+button {
+  transition: all 0.24s ease;
+}
+
+*:focus-visible {
+  outline: 2px solid rgba(0, 174, 246, 0.55);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
