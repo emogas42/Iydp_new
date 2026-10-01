@@ -9,7 +9,9 @@ import { BackToTop } from '@/components/layout/BackToTop'
 
 const Home = lazy(() => import('@/pages/Home').then((m) => ({ default: m.Home })))
 const Opportunities = lazy(() => import('@/pages/Opportunities').then((m) => ({ default: m.Opportunities })))
+const OpportunityDetail = lazy(() => import('@/pages/OpportunityDetail').then((m) => ({ default: m.OpportunityDetail })))
 const News = lazy(() => import('@/pages/News').then((m) => ({ default: m.News })))
+const NewsDetail = lazy(() => import('@/pages/NewsDetail').then((m) => ({ default: m.NewsDetail })))
 const Stories = lazy(() => import('@/pages/Stories').then((m) => ({ default: m.Stories })))
 const FAQ = lazy(() => import('@/pages/FAQ').then((m) => ({ default: m.FAQ })))
 const Contact = lazy(() => import('@/pages/Contact').then((m) => ({ default: m.Contact })))
@@ -37,7 +39,9 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/opportunities" element={<Opportunities />} />
+              <Route path="/opportunity/:id" element={<OpportunityDetail />} />
               <Route path="/news" element={<News />} />
+              <Route path="/news/:id" element={<NewsDetail />} />
               <Route path="/stories" element={<Stories />} />
               <Route path="/faq" element={<FAQ />} />
               <Route path="/contact" element={<Contact />} />

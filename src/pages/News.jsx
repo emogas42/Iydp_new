@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Search, ArrowRight, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Container } from '@/components/ui/Container'
-import { newsItems } from '@/data'
+import { api } from '@/utils/api'
 
 const newsWords = [
   { text: 'happenings', color: '#00aef6' },
@@ -11,10 +11,24 @@ const newsWords = [
   { text: 'announcements', color: '#7dba4e' },
 ]
 
+const stripHtml = (html) => (html || '').replace(/<[^>]*>/g, '')
+
+const formatDate = (iso) =>
+  iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : ''
+
 const News = () => {
+  const [newsItems, setNewsItems] = useState([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [wordIndex, setWordIndex] = useState(0)
   const [activeIndex, setActiveIndex] = useState(0)
+
+  useEffect(() => {
+    api.getNews()
+      .then((data) => setNewsItems(data.items || []))
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -26,12 +40,10 @@ const News = () => {
 
   const filtered = useMemo(
     () =>
-      newsItems.filter(
-        (item) =>
-          item.title.toLowerCase().includes(search.toLowerCase()) ||
-          item.category.toLowerCase().includes(search.toLowerCase())
+      newsItems.filter((item) =>
+        item.title.toLowerCase().includes(search.toLowerCase())
       ),
-    [search]
+    [search, newsItems]
   )
 
   useEffect(() => {
@@ -89,7 +101,13 @@ const News = () => {
             />
           </div>
 
-          {activeNews && (
+          {loading && (
+            <div className="text-center py-20">
+              <p className="text-slate-400">Loading...</p>
+            </div>
+          )}
+
+          {!loading && activeNews && (
             <div className="grid lg:grid-cols-[1fr_1.25fr] gap-7 items-stretch">
               <div className="flex flex-row lg:flex-col gap-3 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
                 {filtered.map((item, i) => {
@@ -107,15 +125,21 @@ const News = () => {
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                          className={`w-24 ${thumbHeight} rounded-xl object-cover`}
-                          loading="lazy"
-                        />
+                        {item.cover_image ? (
+                          <img
+                            src={item.cover_image}
+                            alt={item.title}
+                            className={`w-24 ${thumbHeight} rounded-xl object-cover`}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className={`w-24 ${thumbHeight} rounded-xl bg-slate-100 flex items-center justify-center text-slate-300 text-xl shrink-0`}>
+                            📰
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <p className="text-[11px] font-bold text-primary-500 uppercase tracking-wider mb-1">
-                            {item.category}
+                            {formatDate(item.created_at)}
                           </p>
                           <h3 className="text-sm font-semibold text-slate-900 line-clamp-2 group-hover:text-primary-600 transition-colors">
                             {item.title}
@@ -136,31 +160,28 @@ const News = () => {
                   transition={{ duration: 0.3 }}
                   className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-xl flex flex-col"
                 >
-                  <div className="relative h-56 md:h-64 lg:h-72 overflow-hidden">
-                    <img
-                      src={activeNews.image}
-                      alt={activeNews.title}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
+                  <div className="relative h-56 md:h-64 lg:h-72 overflow-hidden bg-slate-100">
+                    {activeNews.cover_image && (
+                      <img
+                        src={activeNews.cover_image}
+                        alt={activeNews.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
-                    <div className="absolute top-4 left-4">
-                      <span className="bg-primary-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                        {activeNews.category}
-                      </span>
-                    </div>
                   </div>
 
                   <div className="p-6 lg:p-7 flex-1 flex flex-col">
                     <span className="flex items-center gap-1.5 text-xs text-slate-400 mb-3">
                       <Calendar className="w-3 h-3" />
-                      {activeNews.date}
+                      {formatDate(activeNews.created_at)}
                     </span>
                     <h3 className="font-bold text-slate-900 mb-3 text-xl lg:text-2xl">
                       {activeNews.title}
                     </h3>
-                    <p className="text-slate-500 leading-relaxed mb-6 flex-1">
-                      {activeNews.excerpt}
+                    <p className="text-slate-500 leading-relaxed mb-6 flex-1 line-clamp-4">
+                      {stripHtml(activeNews.content)}
                     </p>
 
                     <div className="flex items-center justify-between pt-4 border-t border-slate-100">
@@ -197,7 +218,7 @@ const News = () => {
             </div>
           )}
 
-          {filtered.length === 0 && (
+          {!loading && filtered.length === 0 && (
             <div className="text-center py-20">
               <p className="text-slate-400 text-lg">No news found.</p>
             </div>
