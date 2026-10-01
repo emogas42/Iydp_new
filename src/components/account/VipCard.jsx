@@ -25,29 +25,30 @@ const VipCard = ({ user }) => {
       >
         <div className={`vip-card ${flipped ? 'flipped' : ''}`}>
           <div className="vip-card-face vip-card-front">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.25em] opacity-80">International Youth</p>
-                <p className="text-[10px] font-black uppercase tracking-[0.25em] opacity-80">Dialogue Platform</p>
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] bg-white/20 backdrop-blur px-3 py-1 rounded-full">
-                VIP Member
-              </span>
+            <div className="vip-card-logo-mark" aria-hidden="true">
+              <img src="/logo.png" alt="" />
             </div>
-            <div className="vip-card-chip" />
-            <div>
-              <p className="text-xl font-bold tracking-wide mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                {user.full_name || user.email}
-              </p>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold tracking-[0.15em] opacity-90">{user.membership_no}</p>
-                <p className="text-[10px] font-bold uppercase opacity-70">Since {formatMonthYear(user.vip_activated_at)}</p>
+            <div className="vip-card-front-content">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">International Youth</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">Dialogue Platform</p>
+              </div>
+              <div className="vip-card-chip" />
+              <div>
+                <p className="text-xl font-bold tracking-wide mb-1 text-[#0f172a]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                  {user.full_name || user.email}
+                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-black tracking-[0.15em] text-[#00aef6]">{user.membership_no}</p>
+                  <p className="text-[10px] font-bold uppercase text-slate-500 bg-white/85 backdrop-blur px-2.5 py-1 rounded-full shadow-sm shrink-0">
+                    Since {formatMonthYear(user.vip_activated_at)}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
           <div className="vip-card-face vip-card-back">
-            <div className="magstripe" />
-            <div className="vip-card-qr-wrap mt-8">
+            <div className="vip-card-qr-wrap">
               <img src="/api/account/qr.svg" alt="VIP QR code" />
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-4">{user.membership_no}</p>

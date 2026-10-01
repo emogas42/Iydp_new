@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings | IYDP Admin</title>
+    {% include 'admin/partials/head_assets.html' %}
+</head>
+<body class="antialiased p-3 lg:p-6">
+
+    <div class="flex flex-col lg:flex-row min-h-screen gap-6">
+        {% include 'admin/partials/sidebar.html' %}
+        <main class="flex-1 lg:pr-4">
+            <header class="mb-10 px-4">
+                <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">Settings</h2>
+                <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">Signed in as {{ current_user.username }}</p>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="px-4 mb-6 space-y-2 max-w-xl">
+                    {% for category, message in messages %}
+                    <div class="rounded-2xl px-6 py-4 text-sm font-bold {{ 'bg-green-50 text-green-600 border border-green-100' if category == 'success' else 'bg-red-50 text-red-600 border border-red-100' if category in ['danger', 'error'] else 'bg-blue-50 text-blue-600 border border-blue-100' }}">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="rounded-panel p-8 lg:p-12 shadow-sm max-w-xl">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Change Password</p>
+                <form method="POST" action="{{ url_for('admin_settings') }}" class="space-y-6">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="space-y-2">
+                        <label for="current_password" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Current Password</label>
+                        <input type="password" name="current_password" id="current_password" required
+                               class="input-field text-sm font-bold text-slate-700">
+                    </div>
+
+                    <div class="space-y-2">
+                        <label for="new_password" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">New Password</label>
+                        <input type="password" name="new_password" id="new_password" required minlength="8"
+                               class="input-field text-sm font-bold text-slate-700" placeholder="At least 8 characters">
+                    </div>
+
+                    <div class="space-y-2">
+                        <label for="confirm_password" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Confirm New Password</label>
+                        <input type="password" name="confirm_password" id="confirm_password" required minlength="8"
+                               class="input-field text-sm font-bold text-slate-700">
+                    </div>
+
+                    <div class="flex justify-end pt-4">
+                        <button type="submit" class="btn-save px-10 py-4 text-[10px]">
+                            <i class="fas fa-key mr-2"></i> Update Password
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

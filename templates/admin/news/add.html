@@ -4,49 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create News | IYDP Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    {% include 'admin/partials/head_assets.html' %}
     <style>
-        html { font-size: 125%; }
-        @font-face { font-family: 'Asterone'; src: local('Asterone'); }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #0f172a; }
-        .display-font { font-family: 'Asterone', sans-serif; letter-spacing: 0.05em; }
-        
-        :root {
-            --iydp-blue: #00aef6; --iydp-red: #f06e60;
-            --iydp-green: #7dba4e; --iydp-purple: #6f3d90;
-        }
-
-        .rounded-panel { background: #ffffff; border-radius: 2.5rem; border: 1px solid #e2e8f0; }
-        
-        .nav-pill {
-            border-radius: 9999px; font-weight: 700; transition: all 0.3s ease; color: #64748b;
-        }
-        .nav-pill:hover { background: #f8fafc; color: #0f172a; }
-        .nav-pill.active {
-            background: var(--iydp-purple); color: #fff !important;
-            box-shadow: 0 10px 20px -5px rgba(111, 61, 144, 0.3);
-        }
-
-        .input-field {
-            border-radius: 1.25rem; border: 1.5px solid #e2e8f0; padding: 0.85rem 1.25rem;
-            transition: all 0.3s ease; width: 100%; outline: none; background: #fff;
-        }
-        .input-field:focus { border-color: var(--iydp-green); ring: 4px rgba(125, 186, 78, 0.1); }
-
-        .btn-save {
-            border-radius: 9999px; background: #0f172a; color: #fff;
-            font-weight: 800; text-transform: uppercase; transition: all 0.3s ease;
-            cursor: pointer; border: none;
-        }
-        .btn-save:hover { background: var(--iydp-green); transform: translateY(-2px); box-shadow: 0 10px 15px rgba(125, 186, 78, 0.2); }
-        
-        .btn-cancel {
-            border-radius: 9999px; background: #f1f5f9; color: #64748b;
-            font-weight: 800; text-transform: uppercase; transition: all 0.3s ease;
-            text-align: center;
-        }
-        .btn-cancel:hover { background: #e2e8f0; color: #0f172a; }
+        .input-field:focus { border-color: var(--iydp-green); }
+        .btn-save:hover { background: var(--iydp-green); box-shadow: 0 10px 15px rgba(125, 186, 78, 0.2); }
     </style>
 </head>
 <body class="antialiased p-3 lg:p-6">
@@ -62,6 +23,7 @@
 
             <div class="rounded-panel p-8 lg:p-12 shadow-sm max-w-6xl">
                 <form method="POST" action="{{ url_for('add_news') }}" class="space-y-8">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div class="space-y-2">

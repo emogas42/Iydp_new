@@ -4,53 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blog  | IYDP </title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <style>
-        html { font-size: 125%; }
-        @font-face { font-family: 'Asterone'; src: local('Asterone'); }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #0f172a; }
-        .display-font { font-family: 'Asterone', sans-serif; letter-spacing: 0.05em; }
-        
-        :root {
-            --iydp-blue: #00aef6; --iydp-red: #f06e60;
-            --iydp-green: #7dba4e; --iydp-purple: #6f3d90;
-        }
-
-        .rounded-panel { background: #ffffff; border-radius: 2.5rem; border: 1px solid #e2e8f0; }
-        
-        .nav-pill {
-            border-radius: 9999px; font-weight: 700; transition: all 0.3s ease; color: #64748b;
-        }
-        .nav-pill:hover { background: #f8fafc; color: #0f172a; }
-        .nav-pill.active {
-            background: var(--iydp-purple); color: #fff !important;
-            box-shadow: 0 10px 20px -5px rgba(111, 61, 144, 0.3);
-        }
-
-        .btn-action {
-            border-radius: 9999px; background: #0f172a; color: #fff;
-            font-weight: 800; text-transform: uppercase; transition: all 0.3s ease;
-        }
-        .btn-action:hover { background: var(--iydp-purple); transform: translateY(-2px); box-shadow: 0 10px 15px rgba(111, 61, 144, 0.15); }
-
-        .search-input {
-            border-radius: 9999px; border: 1.5px solid #e2e8f0; padding: 0.65rem 1.25rem 0.65rem 2.75rem;
-            transition: all 0.3s ease; outline: none; width: 100%; font-size: 0.875rem; background: #fff;
-        }
-        .search-input:focus { border-color: var(--iydp-purple); }
-
-        .status-pill {
-            border-radius: 9999px; font-size: 9px; font-weight: 900;
-            text-transform: uppercase; letter-spacing: 0.05em; padding: 0.35rem 1rem;
-            border-width: 1px;
-        }
-
-        .page-link-custom {
-            width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
-            border-radius: 50%; border: 1.5px solid #e2e8f0; transition: all 0.2s;
-        }
-    </style>
+    {% include 'admin/partials/head_assets.html' %}
 </head>
 <body class="antialiased p-3 lg:p-6">
 
@@ -124,7 +78,8 @@
                                         <a href="{{ url_for('edit_blog_post', id=item.id) }}" class="w-9 h-9 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-[#00aef6] hover:text-white transition-all shadow-sm">
                                             <i class="fas fa-pen text-[10px]"></i>
                                         </a>
-                                        <form action="{{ url_for('delete_blog_post', id=item.id) }}" method="POST" class="inline" onsubmit="return confirm('Silmək istədiyinizə əminsiniz?');">
+                                        <form action="{{ url_for('delete_blog_post', id=item.id) }}" method="POST" class="inline" onsubmit="return confirm('Delete permanently?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="w-9 h-9 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm">
                                                 <i class="fas fa-trash-alt text-[10px]"></i>
                                             </button>

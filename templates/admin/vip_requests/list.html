@@ -13,8 +13,8 @@
         <main class="flex-1 lg:pr-4">
             <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 px-4">
                 <div>
-                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">VIP Sorğuları</h2>
-                    <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">{{ pending_payments|length }} ödəniş təsdiq gözləyir</p>
+                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">VIP Requests</h2>
+                    <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">{{ pending_payments|length }} payment(s) awaiting confirmation</p>
                 </div>
             </header>
 
@@ -35,11 +35,11 @@
                     <table class="w-full text-left">
                         <thead>
                             <tr class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">
-                                <th class="px-8 py-5">Üzv</th>
-                                <th class="px-8 py-5">Əlaqə</th>
-                                <th class="px-8 py-5">Məbləğ</th>
-                                <th class="px-8 py-5">Sorğu tarixi</th>
-                                <th class="px-8 py-5 text-right">Əməliyyat</th>
+                                <th class="px-8 py-5">Member</th>
+                                <th class="px-8 py-5">Contact</th>
+                                <th class="px-8 py-5">Amount</th>
+                                <th class="px-8 py-5">Requested</th>
+                                <th class="px-8 py-5 text-right">Operations</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-50">
@@ -47,7 +47,7 @@
                             <tr class="hover:bg-slate-50/80 transition-all">
                                 <td class="px-8 py-6">
                                     <div class="text-sm font-black text-slate-900">{{ payment.user.full_name or payment.user.username }}</div>
-                                    <div class="text-[10px] font-bold text-slate-400 uppercase">{{ payment.user.membership_no or 'Yeni sorğu' }}</div>
+                                    <div class="text-[10px] font-bold text-slate-400 uppercase">{{ payment.user.membership_no or 'New request' }}</div>
                                 </td>
                                 <td class="px-8 py-6 text-xs font-bold text-slate-600">
                                     {{ payment.user.email or '—' }}<br>
@@ -57,14 +57,16 @@
                                 <td class="px-8 py-6 text-xs font-bold text-slate-500">{{ payment.created_at|az_time('%d %b, %Y %H:%M') if payment.created_at else '—' }}</td>
                                 <td class="px-8 py-6 text-right">
                                     <div class="flex justify-end gap-2">
-                                        <form action="{{ url_for('confirm_vip_payment', payment_id=payment.id) }}" method="POST" onsubmit="return confirm('50 AZN ödənişinin alındığını təsdiqləyirsiniz?');">
+                                        <form action="{{ url_for('confirm_vip_payment', payment_id=payment.id) }}" method="POST" onsubmit="return confirm('Confirm that the 50 AZN payment has been received?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="px-4 py-2 rounded-full bg-[#7dba4e] text-white text-[10px] font-black uppercase hover:bg-green-600 transition-all">
-                                                <i class="fas fa-check mr-1"></i> Təsdiqlə
+                                                <i class="fas fa-check mr-1"></i> Confirm
                                             </button>
                                         </form>
-                                        <form action="{{ url_for('reject_vip_payment', payment_id=payment.id) }}" method="POST" onsubmit="return confirm('Bu sorğunu rədd etmək istədiyinizə əminsiniz?');">
+                                        <form action="{{ url_for('reject_vip_payment', payment_id=payment.id) }}" method="POST" onsubmit="return confirm('Reject this VIP request?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="px-4 py-2 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black uppercase hover:bg-red-500 hover:text-white transition-all">
-                                                <i class="fas fa-times mr-1"></i> Rədd Et
+                                                <i class="fas fa-times mr-1"></i> Reject
                                             </button>
                                         </form>
                                     </div>
@@ -72,7 +74,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="5" class="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Gözləyən VIP sorğusu yoxdur</td>
+                                <td colspan="5" class="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No pending VIP requests</td>
                             </tr>
                             {% endfor %}
                         </tbody>

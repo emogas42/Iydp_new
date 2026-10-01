@@ -13,11 +13,11 @@
         <main class="flex-1 lg:pr-4">
             <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 px-4">
                 <div>
-                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">Tədbirlər</h2>
+                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">Events</h2>
                     <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">Found {{ items.total }} events in total</p>
                 </div>
                 <a href="{{ url_for('add_event') }}" class="btn-action px-8 py-4 text-xs">
-                    <i class="fas fa-plus mr-2"></i> Yeni Tədbir
+                    <i class="fas fa-plus mr-2"></i> New Event
                 </a>
             </header>
 
@@ -35,10 +35,10 @@
 
             <div class="rounded-panel overflow-hidden shadow-sm">
                 <div class="px-8 py-6 border-b border-slate-50 bg-slate-50/30 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">Bütün Tədbirlər</h3>
+                    <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">All Events</h3>
                     <form action="{{ url_for('list_events') }}" method="get" class="relative w-full md:w-80">
                         <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                        <input type="text" name="search" value="{{ search or '' }}" class="search-input" placeholder="Tədbir axtar...">
+                        <input type="text" name="search" value="{{ search or '' }}" class="search-input" placeholder="Search events...">
                     </form>
                 </div>
 
@@ -46,10 +46,10 @@
                     <table class="w-full text-left">
                         <thead>
                             <tr class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">
-                                <th class="px-8 py-5">Tədbir</th>
-                                <th class="px-8 py-5">Tarix / Yer</th>
+                                <th class="px-8 py-5">Event</th>
+                                <th class="px-8 py-5">Date / Location</th>
                                 <th class="px-8 py-5 text-center">Status</th>
-                                <th class="px-8 py-5 text-right">Əməliyyat</th>
+                                <th class="px-8 py-5 text-right">Operations</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-50">
@@ -62,25 +62,26 @@
                                     <span class="text-sm font-black text-slate-900 align-middle">{{ item.name }}</span>
                                 </td>
                                 <td class="px-8 py-6 text-xs font-bold text-slate-500">
-                                    {{ item.starts_at|az_time('%d %b, %Y %H:%M') if item.starts_at else 'Tarix qeyd olunmayıb' }}<br>
+                                    {{ item.starts_at|az_time('%d %b, %Y %H:%M') if item.starts_at else 'No date set' }}<br>
                                     <span class="text-slate-400">{{ item.location or '' }}</span>
                                 </td>
                                 <td class="px-8 py-6 text-center">
                                     {% if item.is_active %}
-                                    <span class="status-pill bg-green-50 text-green-500 border-green-100">Aktiv</span>
+                                    <span class="status-pill bg-green-50 text-green-500 border-green-100">Active</span>
                                     {% else %}
-                                    <span class="status-pill bg-slate-100 text-slate-400 border-slate-200">Deaktiv</span>
+                                    <span class="status-pill bg-slate-100 text-slate-400 border-slate-200">Inactive</span>
                                     {% endif %}
                                 </td>
                                 <td class="px-8 py-6 text-right">
                                     <div class="flex justify-end gap-2">
-                                        <a href="{{ url_for('event_attendance', id=item.id) }}" class="w-9 h-9 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-[#6f3d90] hover:text-white transition-all shadow-sm" title="İştirak">
+                                        <a href="{{ url_for('event_attendance', id=item.id) }}" class="w-9 h-9 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-[#6f3d90] hover:text-white transition-all shadow-sm" title="Attendance">
                                             <i class="fas fa-user-check text-[10px]"></i>
                                         </a>
                                         <a href="{{ url_for('edit_event', id=item.id) }}" class="w-9 h-9 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-[#00aef6] hover:text-white transition-all shadow-sm">
                                             <i class="fas fa-pen text-[10px]"></i>
                                         </a>
-                                        <form action="{{ url_for('delete_event', id=item.id) }}" method="POST" class="inline" onsubmit="return confirm('Bu tədbiri silmək istədiyinizə əminsiniz?');">
+                                        <form action="{{ url_for('delete_event', id=item.id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this event?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="w-9 h-9 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm">
                                                 <i class="fas fa-trash-alt text-[10px]"></i>
                                             </button>
@@ -90,7 +91,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="4" class="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Tədbir tapılmadı</td>
+                                <td colspan="4" class="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No events found</td>
                             </tr>
                             {% endfor %}
                         </tbody>

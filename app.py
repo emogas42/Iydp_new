@@ -6,6 +6,9 @@ import secrets
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 
+import logging
+import warnings
+
 from dotenv import load_dotenv
 from flask import (
     Flask, render_template, request, redirect, url_for, flash, session,
@@ -15,6 +18,10 @@ from flask_login import (
     LoginManager, login_user, login_required, current_user, logout_user
 )
 from flask_migrate import Migrate
+from flask_wtf import CSRFProtect
+from flask_wtf.csrf import generate_csrf
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 import qrcode
 import qrcode.image.svg
@@ -29,14 +36,34 @@ from services import checkin as checkin_service
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'ceY<rA5a,82A')
+
+_secret_key = os.environ.get('SECRET_KEY')
+if not _secret_key:
+    _secret_key = secrets.token_hex(32)
+    warnings.warn(
+        'SECRET_KEY is not set in the environment. Generated a random one for '
+        'this process only, so all sessions will be invalidated on restart. '
+        'Set SECRET_KEY in your .env / hosting environment before deploying.',
+        RuntimeWarning,
+    )
+app.config['SECRET_KEY'] = _secret_key
+
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'DATABASE_URL', 'sqlite:///iydp.db'
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Session cookie hardening. SESSION_COOKIE_SECURE defaults to on (cookies only
+# sent over HTTPS); set SESSION_COOKIE_SECURE=0 in .env for local HTTP dev.
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', '1') == '1'
+
 db.init_app(app)
 migrate = Migrate(app, db)
+
+csrf = CSRFProtect(app)
+limiter = Limiter(get_remote_address, app=app, default_limits=[])
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -235,7 +262,13 @@ def user_to_dict(u):
     }
 
 
+@app.route('/api/csrf-token')
+def api_csrf_token():
+    return jsonify({'csrf_token': generate_csrf()})
+
+
 @app.route('/api/auth/register', methods=['POST'])
+@limiter.limit('5 per minute')
 def api_register():
     if current_user.is_authenticated:
         return jsonify({'error': 'already_authenticated'}), 400
@@ -282,6 +315,7 @@ def api_register():
 
 
 @app.route('/api/auth/login', methods=['POST'])
+@limiter.limit('10 per minute')
 def api_login():
     if current_user.is_authenticated:
         return jsonify({'user': user_to_dict(current_user)})
@@ -367,6 +401,7 @@ def api_account_qr():
 
 
 @app.route('/admin/login', methods=['GET', 'POST'])
+@limiter.limit('10 per minute', methods=['POST'])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('admin_dashboard'))
@@ -422,6 +457,32 @@ def admin_dashboard():
                          total_vip=total_vip,
                          pending_vip=pending_vip,
                          total_events=total_events)
+
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@admin_required
+@limiter.limit('10 per minute', methods=['POST'])
+def admin_settings():
+    unread_count = ContactMessage.query.filter_by(is_read=False).count()
+
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        if not check_password_hash(current_user.password, current_password):
+            flash('Current password is incorrect.', 'danger')
+        elif len(new_password) < 8:
+            flash('New password must be at least 8 characters.', 'danger')
+        elif new_password != confirm_password:
+            flash('New passwords do not match.', 'danger')
+        else:
+            current_user.password = generate_password_hash(new_password)
+            db.session.commit()
+            flash('Password updated successfully.', 'success')
+            return redirect(url_for('admin_settings'))
+
+    return render_template('admin/settings.html', unread_count=unread_count)
+
 
 @app.route('/admin/message/<int:message_id>')
 @admin_required
@@ -865,7 +926,7 @@ def add_blog_post():
         is_published = 'is_published' in request.form
 
         if not title or not content:
-            flash('Başlıq və məzmunu daxil etmək məcburidir', 'error')
+            flash('Title and content are required', 'error')
             return redirect(url_for('add_blog_post'))
 
         try:
@@ -880,12 +941,12 @@ def add_blog_post():
             db.session.add(new_post)
             db.session.commit()
 
-            flash('Blog yazısı uğurla əlavə edildi', 'success')
+            flash('Blog post added successfully', 'success')
             return redirect(url_for('list_blog_posts'))
 
         except Exception as e:
             db.session.rollback()
-            flash(f'Xəta baş verdi: {str(e)}', 'error')
+            flash(f'An error occurred: {str(e)}', 'error')
 
     unread_count = ContactMessage.query.filter_by(is_read=False).count()
     return render_template('admin/blog/add.html', unread_count=unread_count)
@@ -906,11 +967,11 @@ def edit_blog_post(id):
 
         try:
             db.session.commit()
-            flash('Blog yazısı uğurla yeniləndi', 'success')
+            flash('Blog post updated successfully', 'success')
             return redirect(url_for('list_blog_posts'))
         except Exception as e:
             db.session.rollback()
-            flash(f'Xəta baş verdi: {str(e)}', 'error')
+            flash(f'An error occurred: {str(e)}', 'error')
 
     return render_template('admin/blog/edit.html', post=post, unread_count=unread_count)
 
@@ -924,10 +985,10 @@ def delete_blog_post(id):
     try:
         db.session.delete(post)
         db.session.commit()
-        flash('Blog yazısı uğurla silindi', 'success')
+        flash('Blog post deleted successfully', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'Xəta baş verdi: {str(e)}', 'error')
+        flash(f'An error occurred: {str(e)}', 'error')
 
     return redirect(url_for('list_blog_posts'))
 
@@ -1042,7 +1103,7 @@ def activate_member_vip(id):
         vip_service.confirm_payment(payment, current_user, note=note)
 
     db.session.commit()
-    flash(f'{member.display_name} üçün VIP üzvlük aktivləşdirildi.', 'success')
+    flash(f'VIP membership activated for {member.display_name}.', 'success')
     return redirect(url_for('view_member', id=member.id))
 
 
@@ -1052,7 +1113,7 @@ def deactivate_member_vip(id):
     member = User.query.filter_by(id=id, is_admin=False).first_or_404()
     vip_service.revoke_vip(member)
     db.session.commit()
-    flash(f'{member.display_name} üçün VIP üzvlük deaktiv edildi.', 'info')
+    flash(f'VIP membership deactivated for {member.display_name}.', 'info')
     return redirect(url_for('view_member', id=member.id))
 
 
@@ -1061,11 +1122,11 @@ def deactivate_member_vip(id):
 def regenerate_member_qr(id):
     member = User.query.filter_by(id=id, is_admin=False).first_or_404()
     if not member.is_vip:
-        flash('Bu istifadəçi VIP üzv deyil.', 'danger')
+        flash('This user is not a VIP member.', 'danger')
         return redirect(url_for('view_member', id=member.id))
     vip_service.regenerate_qr_token(member)
     db.session.commit()
-    flash('Yeni QR kod yaradıldı. Köhnə kart artıq işləməyəcək.', 'success')
+    flash('A new QR code has been issued. The old card will no longer work.', 'success')
     return redirect(url_for('view_member', id=member.id))
 
 
@@ -1088,7 +1149,7 @@ def confirm_vip_payment(payment_id):
     note = request.form.get('note', '').strip() or None
     member = vip_service.confirm_payment(payment, current_user, note=note)
     db.session.commit()
-    flash(f'{member.display_name} üçün ödəniş təsdiqləndi və VIP üzvlük aktivləşdirildi.', 'success')
+    flash(f'Payment confirmed and VIP membership activated for {member.display_name}.', 'success')
     return redirect(url_for('list_vip_requests'))
 
 
@@ -1099,7 +1160,7 @@ def reject_vip_payment(payment_id):
     note = request.form.get('note', '').strip() or None
     vip_service.reject_payment(payment, note=note)
     db.session.commit()
-    flash('VIP sorğusu rədd edildi.', 'info')
+    flash('VIP request rejected.', 'info')
     return redirect(url_for('list_vip_requests'))
 
 # ══════════════════════════════════════════════════════════════
@@ -1135,7 +1196,7 @@ def add_event():
         is_active = 'is_active' in request.form
 
         if not name:
-            flash('Tədbirin adını daxil edin.', 'danger')
+            flash('Please enter an event name.', 'danger')
             return redirect(url_for('add_event'))
 
         starts_at = None
@@ -1149,7 +1210,7 @@ def add_event():
                        starts_at=starts_at, is_active=is_active)
         db.session.add(event)
         db.session.commit()
-        flash('Tədbir yaradıldı.', 'success')
+        flash('Event created.', 'success')
         return redirect(url_for('list_events'))
 
     return render_template('admin/events/add.html', unread_count=unread_count)
@@ -1174,7 +1235,7 @@ def edit_event(id):
         event.is_active = 'is_active' in request.form
 
         db.session.commit()
-        flash('Tədbir yeniləndi.', 'success')
+        flash('Event updated.', 'success')
         return redirect(url_for('list_events'))
 
     starts_at_value = event.starts_at.strftime('%Y-%m-%dT%H:%M') if event.starts_at else ''
@@ -1187,7 +1248,7 @@ def delete_event(id):
     event = Event.query.get_or_404(id)
     db.session.delete(event)
     db.session.commit()
-    flash('Tədbir silindi.', 'success')
+    flash('Event deleted.', 'success')
     return redirect(url_for('list_events'))
 
 
@@ -1251,7 +1312,7 @@ def scanner_checkin():
 
     event = Event.query.get(event_id) if event_id else None
     if not event:
-        return jsonify({'status': 'invalid', 'message': 'Tədbir seçilməyib.'}), 400
+        return jsonify({'status': 'invalid', 'message': 'No event selected.'}), 400
 
     status, payload = checkin_service.check_in(event, code, current_user)
 
@@ -1278,7 +1339,7 @@ def scanner_checkin():
         return jsonify({'status': 'not_vip', 'name': payload.display_name if payload else None})
 
     db.session.rollback()
-    return jsonify({'status': 'invalid', 'message': 'Bu QR kod tanınmadı.'})
+    return jsonify({'status': 'invalid', 'message': 'This QR code was not recognized.'})
 
 # ══════════════════════════════════════════════════════════════
 # JSON API ENDPOINTS (for React SPA)
@@ -1619,4 +1680,4 @@ def spa_catch_all(path):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=os.environ.get('FLASK_DEBUG', '0') == '1')

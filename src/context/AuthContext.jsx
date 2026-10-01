@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { csrfFetch } from '@/utils/csrf'
 
 const AuthContext = createContext(null)
 
@@ -31,7 +32,7 @@ const AuthProvider = ({ children }) => {
   }, [refreshUser])
 
   const login = async (email, password) => {
-    const res = await fetch('/api/auth/login', {
+    const res = await csrfFetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -43,7 +44,7 @@ const AuthProvider = ({ children }) => {
   }
 
   const register = async (payload) => {
-    const res = await fetch('/api/auth/register', {
+    const res = await csrfFetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -55,12 +56,12 @@ const AuthProvider = ({ children }) => {
   }
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await csrfFetch('/api/auth/logout', { method: 'POST' })
     setUser(null)
   }
 
   const requestVip = async () => {
-    const res = await fetch('/api/vip/request', { method: 'POST' })
+    const res = await csrfFetch('/api/vip/request', { method: 'POST' })
     const data = await parseJson(res)
     if (!res.ok) throw new Error(data.error || 'Sorğu göndərilmədi.')
     setUser(data.user)
