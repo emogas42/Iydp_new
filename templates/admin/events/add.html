@@ -12,8 +12,8 @@
         {% include 'admin/partials/sidebar.html' %}
         <main class="flex-1 lg:pr-4">
             <header class="mb-10 px-4">
-                <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">Yeni Tədbir</h2>
-                <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">QR check-in üçün tədbir yaradın</p>
+                <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">New Event</h2>
+                <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">Create an event for QR check-in</p>
             </header>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -30,22 +30,23 @@
 
             <div class="rounded-panel p-8 lg:p-12 shadow-sm max-w-6xl">
                 <form method="POST" action="{{ url_for('add_event') }}" class="space-y-8">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                     <div class="space-y-2">
-                        <label for="name" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Tədbirin adı *</label>
+                        <label for="name" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Event Name *</label>
                         <input type="text" name="name" id="name" required placeholder="Ex: IYDP Youth Networking Night"
                                class="input-field text-sm font-bold text-slate-700">
                     </div>
 
                     <div class="space-y-2">
-                        <label for="description" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Təsvir</label>
+                        <label for="description" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Description</label>
                         <textarea id="description" name="description" rows="4"
-                                  class="input-field text-sm font-medium text-slate-700 leading-relaxed resize-none" placeholder="Tədbir haqqında qısa məlumat..."></textarea>
+                                  class="input-field text-sm font-medium text-slate-700 leading-relaxed resize-none" placeholder="Short description of the event..."></textarea>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div class="space-y-2">
-                            <label for="location" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Yer</label>
+                            <label for="location" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Location</label>
                             <div class="relative">
                                 <i class="fas fa-map-marker-alt absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
                                 <input type="text" name="location" id="location"
@@ -53,7 +54,7 @@
                             </div>
                         </div>
                         <div class="space-y-2">
-                            <label for="starts_at" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Başlama vaxtı</label>
+                            <label for="starts_at" class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Start Time</label>
                             <div class="relative">
                                 <i class="fas fa-calendar-plus absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
                                 <input type="datetime-local" name="starts_at" id="starts_at"
@@ -72,16 +73,16 @@
                                               before:absolute before:content-[''] before:h-4 before:w-4 before:left-1 before:bottom-1 before:bg-white before:rounded-full before:transition-all peer-checked:before:translate-x-6"></label>
                             </div>
                             <div>
-                                <label for="is_active" class="text-sm font-black text-slate-700 cursor-pointer uppercase tracking-tight">Aktiv (Scanner-də görünsün)</label>
-                                <p class="text-[10px] font-bold text-slate-400">Yalnız aktiv tədbirlər QR scanner siyahısında görünür.</p>
+                                <label for="is_active" class="text-sm font-black text-slate-700 cursor-pointer uppercase tracking-tight">Active (visible in scanner)</label>
+                                <p class="text-[10px] font-bold text-slate-400">Only active events appear in the QR scanner's event list.</p>
                             </div>
                         </div>
                     </div>
 
                     <div class="flex flex-col sm:flex-row justify-end gap-4 pt-6">
-                        <a href="{{ url_for('list_events') }}" class="btn-cancel px-10 py-4 text-[10px]">Ləğv Et</a>
+                        <a href="{{ url_for('list_events') }}" class="btn-cancel px-10 py-4 text-[10px]">Cancel</a>
                         <button type="submit" class="btn-save px-12 py-4 text-[10px]">
-                            <i class="fas fa-cloud-upload-alt mr-2"></i> Tədbiri Yadda Saxla
+                            <i class="fas fa-cloud-upload-alt mr-2"></i> Save Event
                         </button>
                     </div>
                 </form>

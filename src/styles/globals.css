@@ -134,19 +134,49 @@
   box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
 }
 .vip-card-front {
-  background: linear-gradient(135deg, #00aef6 0%, #0096d6 35%, #6f3d90 100%);
-  color: white;
+  background: #ffffff;
+  color: #0f172a;
   padding: 1.75rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  border: 1px solid #e5e7eb;
 }
+/* Soft white-to-transparent wash over the left portion so text always sits
+   on a clean, fully white area regardless of the brand mark underneath. */
 .vip-card-front::before {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.18), transparent 45%);
+  background-image: linear-gradient(100deg, #ffffff 0%, #ffffff 46%, rgba(255, 255, 255, 0.55) 62%, rgba(255, 255, 255, 0) 78%);
   pointer-events: none;
+  z-index: 1;
+}
+/* Oversized brand mark, cropped to just the circular icon and bled off the
+   right edge — half of it clipped by the card's own rounded corner. */
+.vip-card-logo-mark {
+  position: absolute;
+  top: 50%;
+  right: -42%;
+  transform: translateY(-50%);
+  height: 145%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  opacity: 0.92;
+  pointer-events: none;
+  z-index: 0;
+}
+.vip-card-logo-mark img {
+  position: absolute;
+  width: 407.7%;
+  max-width: none;
+  left: -89.6%;
+  top: -64.6%;
+}
+.vip-card-front-content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 .vip-card-chip {
   width: 42px;
@@ -163,14 +193,6 @@
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-}
-.vip-card-back .magstripe {
-  position: absolute;
-  top: 1.25rem;
-  left: 0;
-  right: 0;
-  height: 2.5rem;
-  background: #0f172a;
 }
 .vip-card-qr-wrap {
   background: white;

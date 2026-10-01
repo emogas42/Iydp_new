@@ -4,6 +4,7 @@ import { Mail, Phone, MapPin, Send, Loader2, CheckCircle } from 'lucide-react'
 import { Container } from '@/components/ui/Container'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { contactInfo } from '@/data'
+import { csrfFetch } from '@/utils/csrf'
 
 const Contact = () => {
   const [form, setForm] = useState({ name: '', email: '', message: '' })
@@ -18,7 +19,7 @@ const Contact = () => {
       const formData = new FormData()
       Object.entries(form).forEach(([k, v]) => formData.append(k, v))
 
-      const res = await fetch('/api/contact', { method: 'POST', body: formData })
+      const res = await csrfFetch('/api/contact', { method: 'POST', body: formData })
       const data = await res.json()
 
       if (data.status === 'success') {

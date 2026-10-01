@@ -24,18 +24,18 @@
         <main class="flex-1 lg:pr-4">
             <header class="mb-8 px-4">
                 <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">QR Scanner</h2>
-                <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">VIP kartını skan edərək iştirakı qeydə alın</p>
+                <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">Scan a VIP card to record attendance</p>
             </header>
 
             {% if not events %}
             <div class="mx-4 rounded-panel p-10 text-center">
                 <i class="fas fa-calendar-xmark text-3xl text-slate-300 mb-4"></i>
-                <p class="text-slate-500 font-bold">Skan etmək üçün əvvəlcə aktiv bir <a href="{{ url_for('add_event') }}" class="text-[#6f3d90] underline">tədbir yaradın</a>.</p>
+                <p class="text-slate-500 font-bold">Create an active <a href="{{ url_for('add_event') }}" class="text-[#6f3d90] underline">event</a> before scanning.</p>
             </div>
             {% else %}
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 px-4 pb-10">
                 <div class="rounded-panel p-8">
-                    <label for="event-select" class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tədbir</label>
+                    <label for="event-select" class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Event</label>
                     <select id="event-select" class="input-field mt-2 mb-6 text-sm font-bold text-slate-700">
                         {% for e in events %}
                         <option value="{{ e.id }}">{{ e.name }}</option>
@@ -45,25 +45,25 @@
                     <div id="qr-reader" class="w-full"></div>
 
                     <div class="flex gap-3 mt-6">
-                        <button id="start-btn" class="btn-save flex-1 py-4 text-xs"><i class="fas fa-camera mr-2"></i> Kameranı Başlat</button>
-                        <button id="stop-btn" class="btn-cancel flex-1 py-4 text-xs hidden"><i class="fas fa-stop mr-2"></i> Dayandır</button>
+                        <button id="start-btn" class="btn-save flex-1 py-4 text-xs"><i class="fas fa-camera mr-2"></i> Start Camera</button>
+                        <button id="stop-btn" class="btn-cancel flex-1 py-4 text-xs hidden"><i class="fas fa-stop mr-2"></i> Stop</button>
                     </div>
-                    <p class="text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-widest text-center">Kamera üçün brauzer icazəsi və HTTPS tələb olunur</p>
+                    <p class="text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-widest text-center">Requires browser camera permission and HTTPS</p>
                 </div>
 
                 <div class="space-y-6">
                     <div id="result-panel" class="rounded-panel p-10 flex flex-col items-center justify-center text-center min-h-[220px] transition-all">
                         <i id="result-icon" class="fas fa-qrcode text-5xl text-slate-200 mb-4"></i>
-                        <p id="result-title" class="text-lg font-black text-slate-400 uppercase">Skan gözlənilir</p>
+                        <p id="result-title" class="text-lg font-black text-slate-400 uppercase">Waiting for scan</p>
                         <p id="result-subtitle" class="text-sm text-slate-400 font-semibold mt-1"></p>
                     </div>
 
                     <div class="rounded-panel overflow-hidden">
                         <div class="px-8 py-5 border-b border-slate-50 bg-slate-50/30">
-                            <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">Son Skanlar</h3>
+                            <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">Recent Scans</h3>
                         </div>
                         <ul id="recent-list" class="divide-y divide-slate-50 max-h-80 overflow-y-auto">
-                            <li class="px-8 py-8 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Hələ skan edilməyib</li>
+                            <li class="px-8 py-8 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No scans yet</li>
                         </ul>
                     </div>
                 </div>
@@ -108,13 +108,13 @@
     function prependRecent(kind, name, time) {
         if (recentCount === 0) recentList.innerHTML = '';
         recentCount += 1;
-        const labelMap = { ok: 'Qeydə alındı', duplicate: 'Artıq qeydə alınıb', not_vip: 'VIP deyil', invalid: 'Tanınmadı' };
+        const labelMap = { ok: 'Checked in', duplicate: 'Already checked in', not_vip: 'Not VIP', invalid: 'Not recognized' };
         const colorMap = { ok: 'text-[#7dba4e]', duplicate: 'text-yellow-500', not_vip: 'text-[#f06e60]', invalid: 'text-[#f06e60]' };
         const li = document.createElement('li');
         li.className = 'px-8 py-4 flex items-center justify-between';
         li.innerHTML = `
             <div>
-                <div class="text-sm font-black text-slate-900">${name || 'Naməlum'}</div>
+                <div class="text-sm font-black text-slate-900">${name || 'Unknown'}</div>
                 <div class="text-[10px] font-bold ${colorMap[kind]} uppercase">${labelMap[kind]}</div>
             </div>
             <div class="text-xs font-bold text-slate-400">${time || ''}</div>
@@ -129,23 +129,23 @@
         try {
             const resp = await fetch('{{ url_for("scanner_checkin") }}', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
                 body: JSON.stringify({ event_id: eventSelect.value, code: decodedText }),
             });
             const data = await resp.json();
 
             if (data.status === 'ok') {
-                setResult('ok', data.name || 'Uğurla qeydə alındı', `Saat ${data.time} · ${data.membership_no || ''}`);
+                setResult('ok', data.name || 'Checked in', `${data.time} · ${data.membership_no || ''}`);
             } else if (data.status === 'duplicate') {
-                setResult('duplicate', data.name || 'Artıq qeydə alınıb', `Saat ${data.time} · ${data.membership_no || ''}`);
+                setResult('duplicate', data.name || 'Already checked in', `${data.time} · ${data.membership_no || ''}`);
             } else if (data.status === 'not_vip') {
-                setResult('not_vip', data.name || 'VIP üzv deyil', 'Bu şəxsin aktiv VIP üzvlüyü yoxdur.');
+                setResult('not_vip', data.name || 'Not a VIP member', 'This person does not have an active VIP membership.');
             } else {
-                setResult('invalid', 'Kod tanınmadı', data.message || '');
+                setResult('invalid', 'Code not recognized', data.message || '');
             }
             prependRecent(data.status, data.name, data.time);
         } catch (e) {
-            setResult('invalid', 'Şəbəkə xətası', 'Yenidən cəhd edin.');
+            setResult('invalid', 'Network error', 'Please try again.');
         }
 
         setTimeout(() => { busy = false; }, 1800);
@@ -162,7 +162,7 @@
             startBtn.classList.add('hidden');
             stopBtn.classList.remove('hidden');
         } catch (err) {
-            setResult('invalid', 'Kameraya giriş alınmadı', 'Brauzer icazələrini yoxlayın.');
+            setResult('invalid', 'Camera access denied', 'Check your browser permissions.');
         }
     });
 

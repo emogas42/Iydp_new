@@ -1,4 +1,4 @@
-<aside class="w-full lg:w-80 rounded-panel flex flex-col p-8 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] shrink-0 shadow-sm">
+<aside class="w-full lg:w-80 rounded-panel flex flex-col p-8 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-y-auto shrink-0 shadow-sm">
     <div class="flex items-center justify-between lg:justify-center mb-12">
         <img src="{{ url_for('static', filename='logo.png') }}" alt="IYDP Logo" class="h-10 lg:h-16 w-auto">
         <button class="lg:hidden text-2xl" type="button" aria-controls="nav-menu" aria-expanded="false"
@@ -20,7 +20,7 @@
     {% set pending_vip_count = pending_vip_count if pending_vip_count is defined else 0 %}
 
     <nav id="nav-menu" class="hidden lg:flex flex-col gap-2 flex-1" aria-label="Admin">
-        <p class="px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Management</p>
+        <p class="inline-block mx-6 mb-3 px-4 py-1.5 rounded-full bg-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">Management</p>
 
         <ul class="flex flex-col gap-2 list-none m-0 p-0">
             <li>
@@ -61,7 +61,7 @@
             </li>
         </ul>
 
-        <p class="px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 mt-6">VIP Membership</p>
+        <p class="inline-block mx-6 mb-3 mt-6 px-4 py-1.5 rounded-full bg-[#6f3d90]/10 text-[10px] font-black text-[#6f3d90] uppercase tracking-widest">VIP Membership</p>
         <ul class="flex flex-col gap-2 list-none m-0 p-0">
             <li>
                 <a href="{{ url_for('list_members') }}" class="nav-pill {% if is_members %}active{% endif %} flex items-center px-6 py-4 text-sm">
@@ -95,6 +95,11 @@
         <div class="my-4 border-t border-slate-50"></div>
 
         <ul class="list-none m-0 p-0">
+            <li>
+                <a href="{{ url_for('admin_settings') }}" class="nav-pill {% if endpoint == 'admin_settings' %}active{% endif %} flex items-center px-6 py-4 text-sm">
+                    <i class="fas fa-gear mr-4" aria-hidden="true"></i> Settings
+                </a>
+            </li>
             <li>
                 <a href="{{ url_for('logout') }}" class="nav-pill flex items-center px-6 py-4 text-sm text-red-400">
                     <i class="fas fa-sign-out-alt mr-4" aria-hidden="true"></i> Logout

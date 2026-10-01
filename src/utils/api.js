@@ -1,3 +1,5 @@
+import { csrfFetch } from '@/utils/csrf'
+
 const API = '/api'
 
 async function request(url) {
@@ -24,7 +26,7 @@ export const api = {
 
   // Contact
   submitContact: (formData) =>
-    fetch(`${API}/contact`, { method: 'POST', body: formData }).then((r) =>
+    csrfFetch(`${API}/contact`, { method: 'POST', body: formData }).then((r) =>
       r.json()
     ),
 }

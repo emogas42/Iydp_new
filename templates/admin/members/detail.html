@@ -34,11 +34,23 @@
                 <div class="xl:col-span-1 space-y-6">
                     <div class="rounded-panel p-8">
                         <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Profile</p>
-                        <div class="space-y-3 text-sm">
-                            <div class="flex justify-between"><span class="text-slate-400 font-bold">Email</span><span class="font-black text-slate-800">{{ member.email or '—' }}</span></div>
-                            <div class="flex justify-between"><span class="text-slate-400 font-bold">Phone</span><span class="font-black text-slate-800">{{ member.phone or '—' }}</span></div>
-                            <div class="flex justify-between"><span class="text-slate-400 font-bold">Joined</span><span class="font-black text-slate-800">{{ member.created_at|az_time('%d %b, %Y') if member.created_at else '—' }}</span></div>
-                            <div class="flex justify-between"><span class="text-slate-400 font-bold">Membership No.</span><span class="font-black text-slate-800">{{ member.membership_no or '—' }}</span></div>
+                        <div class="space-y-4 text-sm">
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Email</p>
+                                <p class="font-black text-slate-800 break-all">{{ member.email or '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Phone</p>
+                                <p class="font-black text-slate-800">{{ member.phone or '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Joined</p>
+                                <p class="font-black text-slate-800">{{ member.created_at|az_time('%d %b, %Y') if member.created_at else '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Membership No.</p>
+                                <p class="font-black text-slate-800">{{ member.membership_no or '—' }}</p>
+                            </div>
                         </div>
                     </div>
 
@@ -46,23 +58,26 @@
                         <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">VIP Membership</p>
                         {% if member.vip_status == 'active' %}
                         <span class="status-pill bg-purple-50 text-[#6f3d90] border-purple-100 mb-4 inline-flex"><i class="fas fa-crown mr-1"></i> Active</span>
-                        <p class="text-xs text-slate-500 font-semibold mb-6">Aktivləşdi: {{ member.vip_activated_at|az_time('%d %b, %Y') if member.vip_activated_at else '—' }}</p>
-                        <form action="{{ url_for('deactivate_member_vip', id=member.id) }}" method="POST" onsubmit="return confirm('VIP üzvlüyü deaktiv etmək istədiyinizə əminsiniz?');">
-                            <button type="submit" class="btn-cancel w-full py-3 text-xs">VIP-i Deaktiv Et</button>
+                        <p class="text-xs text-slate-500 font-semibold mb-6">Activated: {{ member.vip_activated_at|az_time('%d %b, %Y') if member.vip_activated_at else '—' }}</p>
+                        <form action="{{ url_for('deactivate_member_vip', id=member.id) }}" method="POST" onsubmit="return confirm('Deactivate this member\'s VIP status?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn-cancel w-full py-3 text-xs">Deactivate VIP</button>
                         </form>
-                        <form action="{{ url_for('regenerate_member_qr', id=member.id) }}" method="POST" class="mt-3" onsubmit="return confirm('Yeni QR kod yaradılsın? Köhnə kart artıq işləməyəcək.');">
-                            <button type="submit" class="btn-cancel w-full py-3 text-xs"><i class="fas fa-rotate mr-2"></i>QR Kodu Yenilə</button>
+                        <form action="{{ url_for('regenerate_member_qr', id=member.id) }}" method="POST" class="mt-3" onsubmit="return confirm('Issue a new QR code? The old card will stop working.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn-cancel w-full py-3 text-xs"><i class="fas fa-rotate mr-2"></i>Regenerate QR Code</button>
                         </form>
                         {% else %}
                         {% if member.vip_status == 'pending' %}
-                        <span class="status-pill bg-yellow-50 text-yellow-500 border-yellow-100 mb-4 inline-flex">Sorğu Gözləyir</span>
+                        <span class="status-pill bg-yellow-50 text-yellow-500 border-yellow-100 mb-4 inline-flex">Request Pending</span>
                         {% else %}
-                        <span class="status-pill bg-slate-100 text-slate-400 border-slate-200 mb-4 inline-flex">Adi Üzv</span>
+                        <span class="status-pill bg-slate-100 text-slate-400 border-slate-200 mb-4 inline-flex">Regular Member</span>
                         {% endif %}
-                        <p class="text-xs text-slate-500 font-semibold mb-4">50 AZN ödənişi əl ilə (nağd/köçürmə) alındıqdan sonra VIP-i aktivləşdirin.</p>
-                        <form action="{{ url_for('activate_member_vip', id=member.id) }}" method="POST" onsubmit="return confirm('50 AZN ödənişinin alındığını təsdiqləyirsiniz?');">
-                            <input type="text" name="note" placeholder="Qeyd (məs: nağd qəbz №12)" class="input-field mb-3 text-sm">
-                            <button type="submit" class="btn-save w-full py-3 text-xs">Ödənişi Təsdiqlə və VIP Et</button>
+                        <p class="text-xs text-slate-500 font-semibold mb-4">Activate VIP once the 50 AZN fee has been received in person (cash or transfer).</p>
+                        <form action="{{ url_for('activate_member_vip', id=member.id) }}" method="POST" onsubmit="return confirm('Confirm that the 50 AZN payment has been received?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="text" name="note" placeholder="Note (e.g. cash receipt #12)" class="input-field mb-3 text-sm">
+                            <button type="submit" class="btn-save w-full py-3 text-xs">Confirm Payment &amp; Activate VIP</button>
                         </form>
                         {% endif %}
                     </div>
@@ -71,16 +86,16 @@
                 <div class="xl:col-span-2 space-y-8">
                     <div class="rounded-panel overflow-hidden">
                         <div class="px-8 py-6 border-b border-slate-50 bg-slate-50/30">
-                            <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">Ödəniş Tarixçəsi</h3>
+                            <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">Payment History</h3>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left">
                                 <thead>
                                     <tr class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">
-                                        <th class="px-8 py-4">Məbləğ</th>
+                                        <th class="px-8 py-4">Amount</th>
                                         <th class="px-8 py-4">Status</th>
-                                        <th class="px-8 py-4">Tarix</th>
-                                        <th class="px-8 py-4">Qeyd</th>
+                                        <th class="px-8 py-4">Date</th>
+                                        <th class="px-8 py-4">Note</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-50">
@@ -89,18 +104,18 @@
                                         <td class="px-8 py-4 text-sm font-black text-slate-800">{{ payment.amount }} {{ payment.currency }}</td>
                                         <td class="px-8 py-4">
                                             {% if payment.status == 'completed' %}
-                                            <span class="status-pill bg-green-50 text-green-500 border-green-100">Tamamlandı</span>
+                                            <span class="status-pill bg-green-50 text-green-500 border-green-100">Completed</span>
                                             {% elif payment.status == 'pending' %}
-                                            <span class="status-pill bg-yellow-50 text-yellow-500 border-yellow-100">Gözləyir</span>
+                                            <span class="status-pill bg-yellow-50 text-yellow-500 border-yellow-100">Pending</span>
                                             {% else %}
-                                            <span class="status-pill bg-red-50 text-red-500 border-red-100">Rədd edildi</span>
+                                            <span class="status-pill bg-red-50 text-red-500 border-red-100">Rejected</span>
                                             {% endif %}
                                         </td>
                                         <td class="px-8 py-4 text-xs font-bold text-slate-500">{{ payment.created_at|az_time('%d %b, %Y') if payment.created_at else '—' }}</td>
                                         <td class="px-8 py-4 text-xs text-slate-500">{{ payment.note or '—' }}</td>
                                     </tr>
                                     {% else %}
-                                    <tr><td colspan="4" class="px-8 py-12 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Ödəniş qeydi yoxdur</td></tr>
+                                    <tr><td colspan="4" class="px-8 py-12 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No payment records</td></tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -109,14 +124,14 @@
 
                     <div class="rounded-panel overflow-hidden">
                         <div class="px-8 py-6 border-b border-slate-50 bg-slate-50/30">
-                            <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">Tədbir İştirakı</h3>
+                            <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">Event Attendance</h3>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left">
                                 <thead>
                                     <tr class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">
-                                        <th class="px-8 py-4">Tədbir</th>
-                                        <th class="px-8 py-4">Giriş vaxtı</th>
+                                        <th class="px-8 py-4">Event</th>
+                                        <th class="px-8 py-4">Checked in</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-50">
@@ -126,7 +141,7 @@
                                         <td class="px-8 py-4 text-xs font-bold text-slate-500">{{ a.checked_in_at|az_time if a.checked_in_at else '—' }}</td>
                                     </tr>
                                     {% else %}
-                                    <tr><td colspan="2" class="px-8 py-12 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">İştirak qeydi yoxdur</td></tr>
+                                    <tr><td colspan="2" class="px-8 py-12 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No attendance records</td></tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
