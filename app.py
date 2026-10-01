@@ -76,6 +76,18 @@ def unauthorized():
         return jsonify({'error': 'authentication_required'}), 401
     return redirect(url_for('login', next=request.path))
 
+# React SPA (built `dist/`) — public pages below that have a matching React
+# page serve it directly instead of rendering the old Jinja templates.
+DIST_DIR = os.path.join(app.root_path, 'dist')
+
+
+def serve_spa():
+    index_path = os.path.join(DIST_DIR, 'index.html')
+    if os.path.isfile(index_path):
+        return send_from_directory(DIST_DIR, 'index.html')
+    abort(404)
+
+
 AZERBAIJAN_TZ = timezone(timedelta(hours=4))
 EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
@@ -189,14 +201,7 @@ def get_news_album_images(keyword_image):
 
 @app.route('/')
 def home():
-    opportunities = Opportunity.query.filter_by(is_active=True).order_by(Opportunity.created_at.desc()).all()
-    news = News.query.filter_by(is_published=True).order_by(News.created_at.desc()).limit(3).all()
-    posts = BlogPost.query.filter_by(is_published=True).order_by(BlogPost.created_at.desc()).limit(6).all()
-
-    return render_template('index.html',
-                         opportunities=opportunities,
-                         news=news,
-                         posts=posts)
+    return serve_spa()
 
 @app.route('/contact', methods=['GET', 'POST'])
 def contact():
@@ -238,7 +243,7 @@ def contact():
             flash('An error occurred.', 'danger')
             return redirect(request.referrer or url_for('home'))
 
-    return render_template('contact.html')
+    return serve_spa()
 
 # ══════════════════════════════════════════════════════════════
 # MEMBER ACCOUNT API (consumed by the React SPA — public self-registration,
@@ -661,89 +666,11 @@ def delete_opportunity(id):
     return redirect(url_for('list_opportunities'))
 @app.route('/opportunities')
 def opportunities():
-    search_query = request.args.get('search', '')
-    sort_by = request.args.get('sort', 'newest')
-    current_status = request.args.get('status', '')
-    current_duration = request.args.get('duration', '')
-    page = request.args.get('page', 1, type=int)
-    per_page = 9
-    now_ref = datetime.utcnow()
-    query = Opportunity.query
-
-    if search_query:
-        query = query.filter(
-            (Opportunity.title.ilike(f'%{search_query}%')) |
-            (Opportunity.location.ilike(f'%{search_query}%'))
-        )
-
-    if current_status == 'active':
-        query = query.filter(
-            Opportunity.is_active == True,
-            ((Opportunity.deadline == None) | (Opportunity.deadline >= now_ref))
-        )
-    elif current_status == 'closed':
-        query = query.filter(
-            (Opportunity.is_active == False) |
-            ((Opportunity.deadline != None) & (Opportunity.deadline < now_ref))
-        )
-    else:
-        query = query.filter(Opportunity.is_active == True)
-
-    if current_duration == 'short':
-        query = query.filter(
-            (Opportunity.title.ilike('%short%')) |
-            (Opportunity.description.ilike('%short%')) |
-            Opportunity.tags.any(OpportunityTag.name.ilike('%short%'))
-        )
-    elif current_duration == 'long':
-        query = query.filter(
-            (Opportunity.title.ilike('%long%')) |
-            (Opportunity.description.ilike('%long%')) |
-            Opportunity.tags.any(OpportunityTag.name.ilike('%long%'))
-        )
-
-    if sort_by == 'alphabetical':
-        query = query.order_by(Opportunity.title.asc())
-    elif sort_by == 'deadline_soon':
-        query = query.order_by(Opportunity.deadline.asc().nullslast())
-    elif sort_by == 'oldest':
-        query = query.order_by(Opportunity.created_at.asc())
-    else:
-        query = query.order_by(Opportunity.created_at.desc())
-
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    active_opportunities = pagination.items
-
-    for opp in active_opportunities:
-        opp.applicant_count = len(opp.applications) if hasattr(opp, 'applications') else 0
-        opp.is_closed = bool(opp.deadline and opp.deadline < now_ref)
-
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
-
-    return render_template('opportunities.html',
-                         opportunities=active_opportunities,
-                         pagination=pagination,
-                         search_query=search_query,
-                         current_sort=sort_by,
-                         current_status=current_status,
-                         current_duration=current_duration,
-                         unread_count=unread_count,
-                         title='Opportunities - IYDP')
+    return serve_spa()
 
 @app.route('/opportunity/<int:id>')
 def view_opportunity(id):
-    opportunity = Opportunity.query.get_or_404(id)
-    if not opportunity.is_active:
-        abort(404)
-
-    opportunity.view_count = (opportunity.view_count or 0) + 1
-    db.session.commit()
-
-    opportunity.applicant_count = len(opportunity.applications)
-    return render_template('opportunity_detail.html',
-                         opportunity=opportunity,
-                         title=f'{opportunity.title} - IYDP',
-                         now=datetime.now(timezone.utc))
+    return serve_spa()
 @app.route('/admin/news')
 @login_required
 @admin_required
@@ -821,72 +748,14 @@ def delete_news(id):
     return redirect(url_for('list_news'))
 @app.route('/news')
 def news():
-    search_query = request.args.get('search', '')
-    sort_by = request.args.get('sort', 'newest')
-    page = request.args.get('page', 1, type=int)
-    per_page = 9
-
-    query = News.query.filter_by(is_published=True)
-
-    if search_query:
-        query = query.filter(
-            (News.title.ilike(f'%{search_query}%')) |
-            (News.content.ilike(f'%{search_query}%'))
-        )
-
-    if sort_by == 'alphabetical':
-        query = query.order_by(News.title.asc())
-    elif sort_by == 'oldest':
-        query = query.order_by(News.created_at.asc())
-    else:
-        query = query.order_by(News.created_at.desc())
-
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
-
-    for item in pagination.items:
-        album_images = get_news_album_images(getattr(item, 'keyword_image', None))
-        item.album_images = album_images
-        item.cover_image = album_images[0] if album_images else item.image_url
-
-    return render_template('news.html',
-                         news=pagination,
-                         search=search_query,
-                         current_sort=sort_by,
-                         unread_count=unread_count,
-                         title='Latest News - IYDP')
+    return serve_spa()
 
 
 
 
 @app.route('/news/<int:id>')
 def news_detail(id):
-    news = News.query.get_or_404(id)
-
-    if not news.is_published and not (current_user.is_authenticated and current_user.is_admin):
-        abort(404)
-
-    news.view_count = (news.view_count or 0) + 1
-    db.session.commit()
-
-    album_images = get_news_album_images(getattr(news, 'keyword_image', None))
-    news.album_images = album_images
-    news.cover_image = album_images[0] if album_images else news.image_url
-
-    related_news = News.query.filter(
-        News.id != news.id,
-        News.is_published == True
-    ).order_by(News.created_at.desc()).limit(3).all()
-
-    for item in related_news:
-        related_album = get_news_album_images(getattr(item, 'keyword_image', None))
-        item.cover_image = related_album[0] if related_album else item.image_url
-
-    return render_template('news_detail.html',
-                         news=news,
-                         related_news=related_news,
-                         title=f'{news.title} - IYDP')
+    return serve_spa()
 @app.route('/admin/blog')
 @login_required
 @admin_required
@@ -1656,14 +1525,12 @@ def api_contact():
 
 
 # ══════════════════════════════════════════════════════════════
-# REACT SPA (built `dist/`) — serves routes the Jinja pages above don't
-# own (e.g. /login, /register, /account, /faq, /stories, /erasmus), and
-# their static assets. Only active once `npm run build` has produced a
-# dist/ folder; in local dev those routes are served by `npm run dev`
-# (port 3000) instead, via its own proxy to this Flask app.
+# REACT SPA (built `dist/`) — catch-all for routes the explicit handlers
+# above don't own (e.g. /login, /register, /account, /faq, /stories,
+# /erasmus), and their static assets. Only active once `npm run build`
+# has produced a dist/ folder; in local dev those routes are served by
+# `npm run dev` (port 3000) instead, via its own proxy to this Flask app.
 # ══════════════════════════════════════════════════════════════
-
-DIST_DIR = os.path.join(app.root_path, 'dist')
 
 
 @app.route('/<path:path>')

@@ -115,15 +115,22 @@ qəbul edilə bilər; böyük tətbiq üçün Redis-based storage (`Limiter(stor
 ---
 
 ## Layihənin strukturu (qısa)
-- `app.py` — bütün marşrutlar (public Jinja səhifələr, admin panel, member/VIP JSON API)
+- `app.py` — bütün marşrutlar (admin panel, member/VIP JSON API, public JSON API,
+  SPA-ya yönləndirən route-lar) və `/blog` üçün hələ qalan Jinja səhifələr
 - `models.py` — verilənlər bazası modelləri
 - `services/vip.py`, `services/checkin.py` — VIP ödəniş və QR check-in məntiqi
-- `templates/` — Jinja2 səhifələr: köhnə public səhifələr (`/`, `/news`, `/opportunities`,
-  `/blog`, `/contact`) və bütün admin panel (`/admin/*`)
-- `src/` — React tətbiqi: `/login`, `/register`, `/account` (Hesabım + VIP kart) və
-  `/faq`, `/stories`, `/erasmus`. `npm run build` ilə `dist/`-ə yığılır, Flask onu serve edir.
+- `templates/` — Jinja2 səhifələr: yalnız `/blog`, `/blog/<slug>` (hələ React-ə
+  keçirilməyib) və bütün admin panel (`/admin/*`)
+- `src/` — React tətbiqi: `/`, `/opportunities` (+ `/opportunity/:id`), `/news`
+  (+ `/news/:id`), `/contact`, `/login`, `/register`, `/account` (Hesabım + VIP
+  kart), `/faq`, `/stories`, `/erasmus`. Bu səhifələr real `/api/*` endpoint-lərindən
+  (admin panel-dən idarə olunan) data çəkir. `npm run build` ilə `dist/`-ə yığılır,
+  Flask onu serve edir.
 
-**Qeyd:** Ana səhifə (`/`), `/news`, `/opportunities`, `/blog` hələ də köhnə Jinja
-dizaynındadır (React deyil) — çünki React tərəfdə bu səhifələrin bəziləri hələ tam
-qoşulmayıb (məs. opportunity/blog detail route-ları). Bütün saytı React-ə keçirmək
-istəsəniz, bu ayrıca bir iş kimi planlaşdırılmalıdır.
+**Qeyd:** `/blog` hələ də köhnə Jinja dizaynındadır — React tərəfdə admin-idarəli
+bloq üçün ayrıca səhifə yazılmayıb (`/stories` React-də var, amma o, fərqli, sabit
+nümunə mətnli bir bölmədir, admin panel-in idarə etdiyi bloqla əlaqəli deyil). Blog-u
+da React-ə keçirmək istəsəniz, bu ayrıca bir iş kimi planlaşdırılmalıdır. Homepage-in
+"Programs"/"News" preview bölmələri (`src/components/sections/`) də hələ sabit nümunə
+mətnlə işləyir — əsas `/opportunities` və `/news` səhifələri real data göstərir, amma
+ana səhifədəki qısa "preview" kartları hələ yox.
