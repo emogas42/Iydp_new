@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link, Navigate } from 'react-router-dom'
+import { useLocation, Link, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { UserPlus } from 'lucide-react'
 import { Container } from '@/components/ui/Container'
@@ -7,13 +7,14 @@ import { useAuth } from '@/context/AuthContext'
 
 const Register = () => {
   const { user, loading, register } = useAuth()
-  const navigate = useNavigate()
+  const location = useLocation()
   const [form, setForm] = useState({ full_name: '', email: '', phone: '', password: '', confirm_password: '' })
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  // A successful sign-up sets `user`, so this is also the redirect after submit.
   if (!loading && user) {
-    return <Navigate to="/account" replace />
+    return <Navigate to={location.state?.from || '/account'} replace />
   }
 
   const handleChange = (field) => (e) => setForm({ ...form, [field]: e.target.value })
@@ -24,7 +25,6 @@ const Register = () => {
     setSubmitting(true)
     try {
       await register(form)
-      navigate('/account', { replace: true })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -38,7 +38,7 @@ const Register = () => {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-10">
           <p className="text-primary-500 text-sm font-semibold mb-3 uppercase tracking-wider">Hesabım</p>
           <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight mb-3">Qeydiyyatdan keç</h1>
-          <p className="text-slate-500 max-w-md mx-auto">Pulsuz hesab yaradın, VIP üzvlüyə buradan müraciət edin.</p>
+          <p className="text-slate-500 max-w-md mx-auto">Pulsuz hesab yaradın və rəqəmsal üzvlük kartınızı alın.</p>
         </motion.div>
 
         <motion.div
@@ -94,10 +94,10 @@ const Register = () => {
                 <input
                   type="password"
                   required
-                  minLength={6}
+                  minLength={8}
                   value={form.password}
                   onChange={handleChange('password')}
-                  placeholder="Ən azı 6 simvol"
+                  placeholder="Ən azı 8 simvol"
                   className="w-full bg-slate-50 border border-slate-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 px-4 py-3 rounded-xl outline-none transition text-sm"
                 />
               </div>
@@ -125,7 +125,7 @@ const Register = () => {
 
           <p className="text-center text-sm text-slate-500 font-medium mt-8">
             Artıq hesabınız var?{' '}
-            <Link to="/login" className="text-primary-500 font-semibold hover:underline">
+            <Link to="/login" state={location.state} className="text-primary-500 font-semibold hover:underline">
               Daxil olun
             </Link>
           </p>

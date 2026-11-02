@@ -1,0 +1,45 @@
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% block title %}Stories{% endblock %}
+
+{% block content %}
+{% call ui.page_header('Stories', items.total ~ (' story' if items.total == 1 else ' stories'), icon_name='book-open', color='text-ipurple') %}
+    <a href="{{ url_for('add_story') }}" class="btn btn-primary">{{ ui.icon('plus', 'h-3.5 w-3.5') }} New story</a>
+{% endcall %}
+
+<div class="mb-4">{{ ui.search(url_for('list_stories'), search, 'Search title or name') }}</div>
+
+<div class="card overflow-hidden">
+    {% if items.items %}
+    <ul class="divide-y divide-slate-100">
+        {% for story in items.items %}
+        <li>
+            <a href="{{ url_for('edit_story', id=story.id) }}" class="list-row">
+                {% if story.photos %}
+                <img src="{{ story.photos[0].path }}" alt="" class="h-14 w-16 shrink-0 rounded-lg object-cover">
+                {% else %}
+                <span class="flex h-14 w-16 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">{{ ui.icon('image') }}</span>
+                {% endif %}
+                <span class="min-w-0 flex-1">
+                    <span class="line-clamp-2 text-sm font-medium text-slate-900">{{ story.title }}</span>
+                    <span class="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                        {{ ui.initials_avatar(story.author_name, story.avatar_path, 'h-5 w-5 text-[9px]') }}
+                        <span class="truncate">{{ story.author_name }}</span>
+                        <span class="hidden shrink-0 sm:inline">· {{ story.photos|length }} {{ 'photo' if story.photos|length == 1 else 'photos' }}</span>
+                    </span>
+                </span>
+                {{ ui.status(story.is_published) }}
+                {{ ui.icon('chevron-right', 'h-3.5 w-3.5 text-slate-300') }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    {{ ui.empty('No stories match your search' if search else 'No stories yet',
+                None if search else 'Share a participant’s Erasmus+ or ESC experience.',
+                action=None if search else url_for('add_story'), action_label='New story') }}
+    {% endif %}
+</div>
+
+{{ ui.pagination(items, 'list_stories', search=search) }}
+{% endblock %}

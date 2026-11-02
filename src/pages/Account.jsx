@@ -1,33 +1,42 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Crown, Check, LogOut, Hourglass } from 'lucide-react'
+import { LogOut, Hourglass } from 'lucide-react'
 import { Container } from '@/components/ui/Container'
 import { useAuth } from '@/context/AuthContext'
-import { VipCard } from '@/components/account/VipCard'
+import { MembershipCard } from '@/components/account/MembershipCard'
+import { ChangePassword } from '@/components/account/ChangePassword'
+import { formatDate } from '@/utils/format'
 
 const AZ_MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun', 'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr']
+const APPLICATION_STATUS = { pending: 'Baxılır', accepted: 'Qəbul olunub', rejected: 'Seçilməyib' }
 
-const formatDate = (iso) => {
+const formatLongDate = (iso) => {
   if (!iso) return ''
   const d = new Date(iso)
   return `${d.getDate()} ${AZ_MONTHS[d.getMonth()]}, ${d.getFullYear()}`
 }
 
+const Panel = ({ title, children }) => (
+  <div className="rounded-lg border border-slate-200 bg-white p-6">
+    <h2 className="mb-4 text-sm font-semibold text-slate-900">{title}</h2>
+    {children}
+  </div>
+)
+
 const Account = () => {
   const { user, loading, logout, requestVip, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
-  const [fetching, setFetching] = useState(true)
   const [requesting, setRequesting] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!user) return
     fetch('/api/account')
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : null))
       .then(setData)
-      .finally(() => setFetching(false))
+      .catch(() => setData(null))
   }, [user])
 
   if (!loading && !user) {
@@ -52,108 +61,139 @@ const Account = () => {
     }
   }
 
+  const logoutButton = (extra) => (
+    <button
+      type="button"
+      onClick={handleLogout}
+      className={`items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:border-accent-red hover:text-accent-red ${extra}`}
+    >
+      <LogOut className="h-4 w-4" /> Çıxış
+    </button>
+  )
+
+  const canRequestVip = user && user.card_type === 'standard' && user.vip_status !== 'pending'
+
   return (
-    <div className="min-h-screen pt-[72px] bg-gradient-to-br from-white via-slate-50 to-secondary-50">
-      <Container className="py-16 lg:py-20">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10">
-          <div>
-            <p className="text-primary-500 text-sm font-semibold mb-2 uppercase tracking-wider">Hesabım</p>
-            <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight">
+    <div className="min-h-screen bg-slate-50 pt-[72px]">
+      <Container className="py-12 lg:py-16">
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="mb-1 text-sm font-semibold text-primary-700">Hesabım</p>
+            <h1 className="break-words text-2xl font-bold tracking-tight text-slate-900 lg:text-4xl">
               Salam, {user?.full_name || user?.email}
             </h1>
           </div>
-          <button
-            onClick={handleLogout}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-accent-red transition"
-          >
-            <LogOut className="w-4 h-4" /> Çıxış
-          </button>
+          {/* On phones it sits at the end of the page, away from the card. */}
+          {logoutButton('hidden shrink-0 md:inline-flex')}
         </div>
 
         {error && (
-          <div className="mb-8 rounded-xl p-4 text-sm font-semibold bg-red-50 text-red-700 border border-red-200 max-w-2xl">
+          <div role="alert" className="mb-8 max-w-2xl rounded-md border border-accent-red bg-white p-4 text-sm font-medium text-slate-800">
             {error}
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
-          <div className="lg:col-span-3">
-            {user?.vip_status === 'active' && (
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-5">
+          <div className="min-w-0 space-y-8 lg:col-span-3">
+            {user && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <VipCard user={user} />
+                <MembershipCard user={user} />
               </motion.div>
             )}
 
             {user?.vip_status === 'pending' && (
-              <div className="vip-card-scene">
-                <div className="vip-card-face vip-card-locked rounded-[1.5rem] relative w-full" style={{ aspectRatio: 1.586, position: 'relative' }}>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8">
-                    <Hourglass className="w-8 h-8 text-slate-400 mb-3" />
-                    <p className="font-bold text-slate-600 uppercase text-sm tracking-widest">Sorğunuz Gözlənilir</p>
-                    <p className="text-xs text-slate-500 font-medium mt-2">
-                      Ödəniş təsdiqləndikdən sonra VIP kartınız burada aktivləşəcək.
-                    </p>
-                  </div>
+              <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-5">
+                <Hourglass className="mt-0.5 h-5 w-5 shrink-0 text-primary-600" />
+                <div>
+                  <p className="font-semibold text-slate-900">VIP sorğunuz gözlənilir</p>
+                  <p className="mt-1 text-sm text-slate-600">Ödəniş təsdiqlənəndən sonra kartınız VIP karta çevriləcək.</p>
                 </div>
               </div>
             )}
 
-            {(user?.vip_status === 'none' || user?.vip_status === 'revoked') && (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-100 p-8 md:p-10 max-w-lg">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-secondary-100 text-secondary-600 flex items-center justify-center text-xl">
-                    <Crown className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 uppercase tracking-tight">VIP Üzv Olun</h3>
-                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">50 AZN / il</p>
-                  </div>
+            {canRequestVip && (
+              <div className="rounded-lg border border-slate-200 bg-white p-6">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="font-semibold text-slate-900">VIP üzv olun</h2>
+                  <p className="text-sm font-semibold text-secondary-600">50 AZN / il</p>
                 </div>
-                <ul className="space-y-3 text-sm text-slate-600 font-medium mb-8">
-                  <li className="flex items-start gap-3"><Check className="w-4 h-4 text-accent-green mt-0.5 shrink-0" /> Fiziki kart əvəzinə rəqəmsal VIP kart</li>
-                  <li className="flex items-start gap-3"><Check className="w-4 h-4 text-accent-green mt-0.5 shrink-0" /> Tədbirlərə sürətli QR giriş</li>
-                  <li className="flex items-start gap-3"><Check className="w-4 h-4 text-accent-green mt-0.5 shrink-0" /> İştirak tarixçənizə hesabınızdan baxış</li>
-                </ul>
+                <p className="mt-2 text-sm text-slate-600">
+                  Sorğu göndərdikdən sonra ödənişi ofisimizdə (nağd və ya köçürmə) tamamlayın. Admin təsdiqləyəndən sonra kartınız VIP karta çevriləcək.
+                </p>
                 <button
+                  type="button"
                   onClick={handleRequestVip}
                   disabled={requesting}
-                  className="w-full bg-slate-900 text-white font-semibold py-3.5 rounded-xl hover:bg-secondary-600 transition text-sm disabled:opacity-60"
+                  className="mt-5 h-11 w-full rounded-md bg-secondary-500 text-sm font-semibold text-white transition-colors hover:bg-secondary-600 disabled:opacity-60 sm:w-auto sm:px-6"
                 >
-                  {requesting ? 'Göndərilir...' : 'VIP Üzvlüyə Sorğu Göndər'}
+                  {requesting ? 'Göndərilir...' : 'VIP üzvlüyə sorğu göndər'}
                 </button>
-                <p className="text-[11px] text-slate-400 font-medium mt-4 text-center">
-                  Sorğu göndərdikdən sonra 50 AZN ödənişini ofisimizdə (nağd və ya köçürmə) tamamlayın.
-                  Admin ödənişi təsdiqlədikdən sonra kartınız aktivləşəcək.
-                </p>
               </div>
             )}
           </div>
 
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Profil Məlumatları</p>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between"><span className="text-slate-400 font-medium">Email</span><span className="font-semibold text-slate-800">{user?.email}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400 font-medium">Telefon</span><span className="font-semibold text-slate-800">{user?.phone || '—'}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400 font-medium">Qeydiyyat</span><span className="font-semibold text-slate-800">{formatDate(user?.created_at) || '—'}</span></div>
-              </div>
-            </div>
+          <div className="min-w-0 space-y-6 lg:col-span-2">
+            <Panel title="Profil məlumatları">
+              <dl className="space-y-3 text-sm">
+                {[['Email', user?.email], ['Telefon', user?.phone || '—'], ['Qeydiyyat', formatLongDate(user?.created_at) || '—']].map(([label, value]) => (
+                  <div key={label} className="flex justify-between gap-4">
+                    <dt className="text-slate-500">{label}</dt>
+                    <dd className="min-w-0 break-words text-right font-medium text-slate-800">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
 
-            {!fetching && data?.attendances?.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Son İştirakınız</p>
-                <div className="space-y-3">
-                  {data.attendances.slice(0, 5).map((a) => (
-                    <div key={a.id} className="flex items-center justify-between text-sm">
-                      <span className="font-semibold text-slate-700">{a.event_name}</span>
-                      <span className="text-[10px] font-semibold text-slate-400">{formatDate(a.checked_in_at)}</span>
-                    </div>
+            {user?.must_change_password && <ChangePassword required onChanged={refreshUser} />}
+
+            {data?.event_registrations?.length > 0 && (
+              <Panel title="Tədbirlərim">
+                <ul className="space-y-3 text-sm">
+                  {data.event_registrations.map((r) => (
+                    <li key={r.id} className="flex justify-between gap-4">
+                      <Link to={`/events/${r.event_id}`} className="min-w-0 font-medium text-slate-800 hover:text-primary-700">{r.event_name}</Link>
+                      <span className="shrink-0 text-slate-500">{formatDate(r.starts_at)}</span>
+                    </li>
                   ))}
-                </div>
-              </div>
+                </ul>
+              </Panel>
+            )}
+
+            {data?.applications?.length > 0 && (
+              <Panel title="Müraciətlərim">
+                <ul className="space-y-3 text-sm">
+                  {data.applications.map((a) => (
+                    <li key={a.id} className="flex justify-between gap-4">
+                      <Link to={`/projects/${a.project_id}`} className="min-w-0 font-medium text-slate-800 hover:text-primary-700">{a.project_title}</Link>
+                      <span className="shrink-0 text-slate-500">{APPLICATION_STATUS[a.status] || a.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            )}
+
+            {data?.attendances?.length > 0 && (
+              <Panel title="Son iştirakım">
+                <ul className="space-y-3 text-sm">
+                  {data.attendances.slice(0, 5).map((a) => (
+                    <li key={a.id} className="flex justify-between gap-4">
+                      <span className="min-w-0 font-medium text-slate-800">{a.event_name}</span>
+                      <span className="shrink-0 text-slate-500">{formatLongDate(a.checked_in_at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
             )}
           </div>
         </div>
+
+        {user && !user.must_change_password && (
+          <div className="mt-6 max-w-md lg:ml-auto">
+            <ChangePassword onChanged={refreshUser} />
+          </div>
+        )}
+
+        {logoutButton('mt-12 inline-flex w-full md:hidden')}
       </Container>
     </div>
   )

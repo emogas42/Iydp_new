@@ -345,7 +345,7 @@ const Erasmus = () => {
                 </p>
               </div>
               <div className="mt-8 flex flex-wrap gap-4">
-                <Button to="/opportunities" arrow>
+                <Button to="/projects" arrow>
                   View current projects
                 </Button>
                 <Button to="/contact" variant="outline">
@@ -405,7 +405,7 @@ const Erasmus = () => {
               Whether you want to volunteer abroad, join a youth exchange, or attend a training course — IYDP can help you take the first step.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <Button to="/opportunities" size="lg" arrow>
+              <Button to="/projects" size="lg" arrow>
                 Explore opportunities
               </Button>
               <Button to="/contact" variant="outline" size="lg">

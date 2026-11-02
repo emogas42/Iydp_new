@@ -14,7 +14,7 @@
                 <li><a href="{{ url_for('home') }}" class="px-4 py-2 rounded-full transition-colors {% if request.endpoint == 'home' %}bg-[#00aef6]/10 text-[#00aef6]{% else %}text-slate-600 hover:text-slate-900{% endif %}" {% if request.endpoint == 'home' %}aria-current="page"{% endif %}>Home</a></li>
                 <li><a href="{{ url_for('opportunities') }}" class="px-4 py-2 rounded-full transition-colors {% if request.endpoint in ['opportunities', 'view_opportunity'] %}bg-[#00aef6]/10 text-[#00aef6]{% else %}text-slate-600 hover:text-slate-900{% endif %}" {% if request.endpoint in ['opportunities', 'view_opportunity'] %}aria-current="page"{% endif %}>Opportunities</a></li>
                 <li><a href="{{ url_for('news') }}" class="px-4 py-2 rounded-full transition-colors {% if request.endpoint in ['news', 'news_detail'] %}bg-[#f06e60]/10 text-[#f06e60]{% else %}text-slate-600 hover:text-slate-900{% endif %}" {% if request.endpoint in ['news', 'news_detail'] %}aria-current="page"{% endif %}>News</a></li>
-                <li><a href="{{ url_for('blog') }}" class="px-4 py-2 rounded-full transition-colors {% if request.endpoint in ['blog', 'blog_post'] %}bg-[#6f3d90]/10 text-[#6f3d90]{% else %}text-slate-600 hover:text-slate-900{% endif %}" {% if request.endpoint in ['blog', 'blog_post'] %}aria-current="page"{% endif %}>Blog</a></li>
+                <li><a href="/stories" class="px-4 py-2 rounded-full transition-colors {% if request.path.startswith('/stories') %}bg-[#6f3d90]/10 text-[#6f3d90]{% else %}text-slate-600 hover:text-slate-900{% endif %}" {% if request.path.startswith('/stories') %}aria-current="page"{% endif %}>Stories</a></li>
                 <li><a href="{{ url_for('contact') }}" class="px-4 py-2 rounded-full transition-colors {% if request.endpoint == 'contact' %}bg-[#7dba4e]/10 text-[#7dba4e]{% else %}text-slate-600 hover:text-slate-900{% endif %}" {% if request.endpoint == 'contact' %}aria-current="page"{% endif %}>Contact</a></li>
             </ul>
 
@@ -52,7 +52,7 @@
                 <li><a href="{{ url_for('home') }}" class="mobile-link block rounded-xl px-4 py-3 {% if request.endpoint == 'home' %}bg-[#00aef6]/10 text-[#00aef6]{% else %}text-slate-700{% endif %}">Home</a></li>
                 <li><a href="{{ url_for('opportunities') }}" class="mobile-link block rounded-xl px-4 py-3 {% if request.endpoint in ['opportunities', 'view_opportunity'] %}bg-[#00aef6]/10 text-[#00aef6]{% else %}text-slate-700{% endif %}">Opportunities</a></li>
                 <li><a href="{{ url_for('news') }}" class="mobile-link block rounded-xl px-4 py-3 {% if request.endpoint in ['news', 'news_detail'] %}bg-[#f06e60]/10 text-[#f06e60]{% else %}text-slate-700{% endif %}">News</a></li>
-                <li><a href="{{ url_for('blog') }}" class="mobile-link block rounded-xl px-4 py-3 {% if request.endpoint in ['blog', 'blog_post'] %}bg-[#6f3d90]/10 text-[#6f3d90]{% else %}text-slate-700{% endif %}">Blog</a></li>
+                <li><a href="/stories" class="mobile-link block rounded-xl px-4 py-3 {% if request.path.startswith('/stories') %}bg-[#6f3d90]/10 text-[#6f3d90]{% else %}text-slate-700{% endif %}">Stories</a></li>
                 <li><a href="{{ url_for('contact') }}" class="mobile-link block rounded-xl px-4 py-3 {% if request.endpoint == 'contact' %}bg-[#7dba4e]/10 text-[#7dba4e]{% else %}text-slate-700{% endif %}">Contact</a></li>
             </ul>
         </nav>

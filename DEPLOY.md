@@ -50,12 +50,12 @@ bu, hər restart-da sessiyaları etibarsız edəcək, ona görə mütləq təyin
 ```bash
 flask db upgrade
 ```
-Bu, `instance/iydp.db` faylını yaradacaq və bütün cədvəlləri quracaq, həmçinin ilk
-`admin` hesabını (username: `admin`, şifrə: `admin123`) avtomatik yaradacaq.
+Bu, `instance/iydp.db` faylını yaradacaq və bütün cədvəlləri quracaq.
 
-**VACİB:** Deploy etdikdən dərhal sonra **Admin Panel → Settings** səhifəsindən
-(`/admin/settings`) şifrəni dəyişin. Bu default şifrə hər kəsə məlumdur (bu kodun
-özündə də yazılıb) və dərhal dəyişdirilməlidir.
+**İlk admin hesabı:** kodda heç bir default şifrə yoxdur. `flask db upgrade` işlətməzdən
+əvvəl `.env` faylına `ADMIN_PASSWORD=<uzun şifrə>` yazın (istəsəniz `ADMIN_USERNAME` də).
+Admin hesabı ilk işə düşmədə yaradılır. Giriş etdikdən sonra `ADMIN_PASSWORD` sətrini
+`.env`-dən silin; şifrəni sonra **Admin Panel → Settings**-dən dəyişə bilərsiniz.
 
 ### 7. Kamera ilə QR skaner üçün
 `/admin/scanner` səhifəsi brauzerin kamerasından istifadə edir — bu, **yalnız HTTPS
@@ -78,7 +78,7 @@ cPanel → Setup Python App → "Restart" düyməsini basın ki, dəyişikliklə
      dolduracaqsınızsa, mütləq `--bind 0.0.0.0:$PORT` hissəsini daxil edin, əks halda
      Render tətbiqi "port tapılmadı" xətası ilə deploy-u uğursuz sayacaq)
 4. **Environment** bölməsində əlavə edin: `SECRET_KEY` (uzun təsadüfi sətir).
-5. Deploy edin, `/admin/settings`-dən şifrəni dəyişin.
+5. Environment-ə `ADMIN_PASSWORD` də əlavə edin, deploy edin, sonra onu silin.
 
 **Vacib məhdudiyyət:** Render-in pulsuz "Web Service" planında disk **müvəqqətidir** —
 hər redeploy/restart-da SQLite bazası sıfırlanır (bütün üzvlər, ödənişlər, iştirak
@@ -91,12 +91,19 @@ pulsuz PostgreSQL** əlavəsini qoşun:
    defolt olaraq daxil edilməyib, çünki bəzi Python versiyalarında əlavə build
    addımı tələb edir).
 
+**Yüklənən şəkillər də eyni problemlə üzləşir.** Admin paneldən yüklənən bütün şəkillər
+(story, layihə posterləri və qalereyaları, tədbir posterləri) `static/uploads/` qovluğunda saxlanılır. Render-in
+pulsuz planında bu qovluq da hər redeploy-da silinir. Real istifadə üçün Render-də
+**Persistent Disk** qoşun və onu `static/uploads` yoluna bağlayın (və ya cPanel
+istifadə edin, orada fayllar qalıcıdır). Bu qovluq `.gitignore`-dadır, git-ə düşmür,
+ona görə serveri köçürəndə onu ayrıca kopyalayın.
+
 ---
 
 ## Təhlükəsizlik — nəyi mütləq etməlisiniz
 
 - [ ] `SECRET_KEY`-i `.env`/hosting environment-də təyin edin (yuxarıya baxın).
-- [ ] Deploydan dərhal sonra `/admin/settings`-dən admin şifrəsini dəyişin.
+- [ ] `ADMIN_PASSWORD`-u uzun seçin, ilk girişdən sonra environment-dən silin.
 - [ ] HTTPS-i aktivləşdirin (cPanel: AutoSSL; Render: avtomatik).
 - [ ] `SESSION_COOKIE_SECURE=1` qalsın (default belədir) — bu, sessiya cookie-sinin
       yalnız HTTPS üzərində göndərilməsini təmin edir. Yalnız lokal HTTP test üçün 0 edin.
@@ -116,21 +123,19 @@ qəbul edilə bilər; böyük tətbiq üçün Redis-based storage (`Limiter(stor
 
 ## Layihənin strukturu (qısa)
 - `app.py` — bütün marşrutlar (admin panel, member/VIP JSON API, public JSON API,
-  SPA-ya yönləndirən route-lar) və `/blog` üçün hələ qalan Jinja səhifələr
+  SPA-ya yönləndirən route-lar)
 - `models.py` — verilənlər bazası modelləri
-- `services/vip.py`, `services/checkin.py` — VIP ödəniş və QR check-in məntiqi
-- `templates/` — Jinja2 səhifələr: yalnız `/blog`, `/blog/<slug>` (hələ React-ə
-  keçirilməyib) və bütün admin panel (`/admin/*`)
-- `src/` — React tətbiqi: `/`, `/opportunities` (+ `/opportunity/:id`), `/news`
+- `services/vip.py`, `services/checkin.py` — VIP ödəniş və QR check-in məntiqi (QR hər üzvdə var)
+- `services/uploads.py` — admin paneldən yüklənən şəkillərin yoxlanması, kiçildilməsi
+  (WebP) və silinməsi
+- `templates/admin/` — bütün admin panel (`/admin/*`)
+- `src/` — React tətbiqi: `/`, `/projects` (+ `/projects/finished`, `/projects/:id`), `/events` (+ `/events/:id`), `/news`
   (+ `/news/:id`), `/contact`, `/login`, `/register`, `/account` (Hesabım + VIP
-  kart), `/faq`, `/stories`, `/erasmus`. Bu səhifələr real `/api/*` endpoint-lərindən
+  kart), `/faq`, `/stories` (+ `/stories/:slug`), `/erasmus`. Bu səhifələr real `/api/*` endpoint-lərindən
   (admin panel-dən idarə olunan) data çəkir. `npm run build` ilə `dist/`-ə yığılır,
   Flask onu serve edir.
 
-**Qeyd:** `/blog` hələ də köhnə Jinja dizaynındadır — React tərəfdə admin-idarəli
-bloq üçün ayrıca səhifə yazılmayıb (`/stories` React-də var, amma o, fərqli, sabit
-nümunə mətnli bir bölmədir, admin panel-in idarə etdiyi bloqla əlaqəli deyil). Blog-u
-da React-ə keçirmək istəsəniz, bu ayrıca bir iş kimi planlaşdırılmalıdır. Homepage-in
-"Programs"/"News" preview bölmələri (`src/components/sections/`) də hələ sabit nümunə
-mətnlə işləyir — əsas `/opportunities` və `/news` səhifələri real data göstərir, amma
-ana səhifədəki qısa "preview" kartları hələ yox.
+**Stories:** iştirakçıların Erasmus+/ESC təcrübələri admin paneldə **Stories**
+bölməsindən idarə olunur (başlıq, profil fotosu, ad, qısa məlumat, mətn, layihə
+şəkilləri). Köhnə bloq bölməsi silinib. Homepage-in Projects, Stories və News bölmələri real datadır,
+boş olanda görünmür.

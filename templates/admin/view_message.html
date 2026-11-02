@@ -1,77 +1,30 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View Message | IYDP </title>
-    {% include 'admin/partials/head_assets.html' %}
-    <style>
-        .btn-reply { border-radius: 9999px; background: var(--iydp-blue); color: #fff; font-weight: 800; text-transform: uppercase; transition: all 0.3s ease; }
-        .btn-reply:hover { transform: translateY(-2px); box-shadow: 0 10px 15px rgba(0, 174, 246, 0.2); }
-        .status-dot { box-shadow: 0 0 10px currentColor; }
-    </style>
-</head>
-<body class="antialiased p-3 lg:p-6">
-    <div class="flex flex-col lg:flex-row min-h-screen gap-6">
-        
-        {% include 'admin/partials/sidebar.html' %}
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% block title %}Message{% endblock %}
 
-        <main class="flex-1 lg:pr-4">
-            <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 px-4">
-                <div>
-                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">Message Details</h2>
-                    <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">Message from {{ message.name }}</p>
-                </div>
-                <a href="{{ url_for('list_messages') }}" class="btn-reply px-8 py-4 text-xs bg-slate-900 hover:bg-slate-800">
-                    <i class="fas fa-arrow-left mr-2"></i> Back to Inbox
-                </a>
-            </header>
+{% block content %}
+{% call ui.page_header('Message', message.created_at|az_time, back=url_for('list_messages'), back_label='Messages', icon_name='mail', color='text-iblue') %}{% endcall %}
 
-            <div class="rounded-panel overflow-hidden shadow-sm bg-white">
-                <div class="px-8 py-8 border-b border-slate-50 bg-slate-50/30">
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div class="flex items-center gap-5">
-                            <div class="w-16 h-16 rounded-3xl bg-[#00aef6] text-white flex items-center justify-center text-2xl font-black shadow-lg shadow-[#00aef6]/20">
-                                {{ message.name[:1].upper() }}
-                            </div>
-                            <div>
-                                <h3 class="text-xl font-black text-slate-900">{{ message.name }}</h3>
-                                <p class="text-sm font-bold text-[#00aef6]">{{ message.email }}</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Received Date</div>
-                            <div class="text-sm font-black text-slate-700"><i class="far fa-calendar-alt mr-2 text-[#00aef6]"></i>{{ message.created_at|az_time }}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="p-8">
-                    <div class="bg-slate-50 rounded-[2rem] p-8 min-h-[200px] border border-slate-100 relative">
-                        <div class="relative z-10 text-slate-700 leading-relaxed font-medium">
-                            {{ message.message|replace('\n', '<br>')|safe }}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="px-8 py-6 border-t border-slate-50 bg-slate-50/20 flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div class="flex flex-col gap-1">
-                    </div>
-                    
-                    <div class="flex gap-3">
-                        <form action="{{ url_for('delete_message', message_id=message.id) }}" method="POST" onsubmit="return confirm('Delete this message permanently?');">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="px-6 py-3 rounded-full border-2 border-slate-100 text-slate-400 font-black text-[10px] uppercase hover:bg-red-500 hover:text-white hover:border-red-500 transition-all">
-                                <i class="fas fa-trash-alt mr-2"></i> Delete
-                            </button>
-                        </form>
-                        <a href="mailto:{{ message.email }}" class="btn-reply px-10 py-3 text-[10px]">
-                            <i class="fas fa-paper-plane mr-2"></i> Reply Message
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </main>
+<article class="card">
+    <div class="flex items-center gap-3 border-b border-slate-200 p-4 sm:p-5">
+        {{ ui.initials_avatar(message.name, size='h-11 w-11 text-sm') }}
+        <div class="min-w-0">
+            <p class="truncate font-semibold text-slate-900">{{ message.name }}</p>
+            <a href="mailto:{{ message.email }}" class="link block truncate text-sm font-medium">{{ message.email }}</a>
+        </div>
     </div>
-</body>
-</html>
+    <div class="p-4 text-[15px] leading-relaxed text-slate-700 sm:p-5">
+        {{ message.message|replace('\n', '<br>')|safe }}
+    </div>
+</article>
+
+<div class="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+    <form action="{{ url_for('delete_message', message_id=message.id) }}" method="POST" onsubmit="return confirm('Delete this message permanently?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger w-full sm:w-auto">{{ ui.icon('trash-2', 'h-3.5 w-3.5') }} Delete</button>
+    </form>
+    <a href="mailto:{{ message.email }}?subject={{ 'Re: your message to IYDP'|urlencode }}" class="btn btn-primary w-full sm:w-auto">
+        {{ ui.icon('send', 'h-3.5 w-3.5') }} Reply by email
+    </a>
+</div>
+{% endblock %}

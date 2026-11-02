@@ -1,71 +1,63 @@
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="icon" href="{{ url_for('static', filename='logo.png') }}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
-<style>
-    html { font-size: 125%; }
-    body { font-family: 'Plus Jakarta Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #0f172a; }
-    .display-font { font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif; }
-
-    :root {
-        --iydp-blue: #00aef6; --iydp-red: #f06e60;
-        --iydp-green: #7dba4e; --iydp-purple: #6f3d90;
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    // The four colours of the IYDP logo, plus a dark ink for text.
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    ink: '#0f172a',
+                    iblue: { DEFAULT: '#00aef6', 600: '#008cc5', dark: '#006994', soft: '#e6f7fe' },
+                    ipurple: { DEFAULT: '#6f3d90', dark: '#593173', soft: '#f3eef7' },
+                    igreen: { DEFAULT: '#7dba4e', dark: '#4f7f2b', soft: '#f0f7ea' },
+                    ired: { DEFAULT: '#f06e60', dark: '#c7463a', soft: '#fdeeec' },
+                },
+                fontFamily: {
+                    sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+                },
+            },
+        },
     }
+</script>
+<style type="text/tailwindcss">
+    @layer components {
+        .card { @apply rounded-lg border border-slate-200 bg-white; }
+        .card-header { @apply flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5; }
+        .card-title { @apply text-[15px] font-semibold text-ink; }
 
-    .rounded-panel { background: #ffffff; border-radius: 2.5rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02); }
+        .btn { @apply inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-iblue focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60; }
+        .btn-primary { @apply bg-iblue-600 text-white hover:bg-iblue-dark; }
+        .btn-secondary { @apply border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
+        .btn-success { @apply bg-igreen-dark text-white hover:bg-[#3f6622]; }
+        .btn-danger { @apply border border-slate-300 bg-white text-ired-dark hover:border-ired hover:bg-ired-soft; }
+        .btn-ghost { @apply text-slate-600 hover:bg-slate-100 hover:text-ink; }
+        .btn-lg { @apply h-12 px-5 text-[15px]; }
 
-    .nav-pill {
-        border-radius: 9999px; font-weight: 700; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); color: #64748b;
+        .link { @apply font-semibold text-iblue-dark hover:text-ink; }
+
+        .label { @apply mb-1.5 flex items-baseline gap-1 text-sm font-semibold text-slate-800; }
+        .label .optional { @apply ml-auto text-xs font-normal text-slate-400; }
+        .label .required { @apply text-ired-dark; }
+        .hint { @apply mt-1.5 text-[13px] leading-snug text-slate-500; }
+        .input { @apply block w-full rounded-md border border-slate-300 bg-white px-3.5 py-3 text-[15px] text-ink placeholder:text-slate-400 transition focus:border-iblue focus:outline-none focus:ring-2 focus:ring-iblue/25; }
+        .input-icon { @apply relative; }
+        .input-icon > svg { @apply pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400; }
+        .input-icon > .input { @apply pl-10; }
+        textarea.input { @apply leading-relaxed; }
+
+        /* Status: a coloured dot and a word. */
+        .badge { @apply inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-600; }
+        .badge::before { content: ''; @apply h-2 w-2 shrink-0 rounded-full bg-slate-300; }
+        .badge-green::before { @apply bg-igreen; }
+        .badge-amber::before { @apply bg-iblue; }
+        .badge-blue::before { @apply bg-iblue; }
+        .badge-red::before { @apply bg-ired; }
+        .badge-purple::before { @apply bg-ipurple; }
+        .badge-slate::before { @apply bg-slate-300; }
+
+        .list-row { @apply flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50 active:bg-slate-100 sm:px-5; }
     }
-    .nav-pill:hover { background: #f8fafc; color: #0f172a; }
-    .nav-pill.active {
-        background: var(--iydp-purple); color: #fff !important;
-        box-shadow: 0 10px 20px -5px rgba(111, 61, 144, 0.3);
-    }
-
-    .btn-action {
-        border-radius: 9999px; background: #0f172a; color: #fff;
-        font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.3s ease;
-    }
-    .btn-action:hover { background: var(--iydp-purple); transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-
-    .input-field {
-        border-radius: 1.25rem; border: 1.5px solid #e2e8f0; padding: 0.85rem 1.25rem;
-        transition: all 0.3s ease; width: 100%; outline: none; background: #fff;
-    }
-    .input-field:focus { border-color: var(--iydp-purple); }
-
-    .btn-save {
-        border-radius: 9999px; background: #0f172a; color: #fff;
-        font-weight: 800; text-transform: uppercase; transition: all 0.3s ease;
-        cursor: pointer; border: none;
-    }
-    .btn-save:hover { background: var(--iydp-purple); transform: translateY(-2px); box-shadow: 0 10px 15px rgba(111, 61, 144, 0.2); }
-
-    .btn-cancel {
-        border-radius: 9999px; background: #f1f5f9; color: #64748b;
-        font-weight: 800; text-transform: uppercase; transition: all 0.3s ease;
-        text-align: center;
-    }
-    .btn-cancel:hover { background: #e2e8f0; color: #0f172a; }
-
-    .search-input {
-        border-radius: 9999px; border: 1.5px solid #e2e8f0; padding: 0.65rem 1.25rem 0.65rem 2.75rem;
-        transition: all 0.3s ease; outline: none; width: 100%; font-size: 0.875rem;
-    }
-    .search-input:focus { border-color: var(--iydp-purple); background: #fff; }
-
-    .status-pill {
-        border-radius: 9999px; font-size: 9px; font-weight: 900;
-        text-transform: uppercase; letter-spacing: 0.05em; padding: 0.35rem 1rem;
-        border-width: 1px;
-    }
-
-    .page-link-custom {
-        width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
-        border-radius: 50%; border: 1.5px solid #e2e8f0; transition: all 0.2s;
-    }
-
-    .stat-card { border-bottom-width: 4px; }
 </style>

@@ -30,20 +30,22 @@ def upgrade():
                type_=sa.String(length=255),
                existing_nullable=True)
 
-    with op.batch_alter_table('user', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('full_name', sa.String(length=150), nullable=True))
-        batch_op.add_column(sa.Column('email', sa.String(length=150), nullable=True))
-        batch_op.add_column(sa.Column('phone', sa.String(length=30), nullable=True))
-        batch_op.add_column(sa.Column('created_at', sa.DateTime(), nullable=True))
-        batch_op.add_column(sa.Column('is_vip', sa.Boolean(), nullable=False, server_default=sa.false()))
-        batch_op.add_column(sa.Column('vip_status', sa.String(length=20), nullable=False, server_default='none'))
-        batch_op.add_column(sa.Column('vip_requested_at', sa.DateTime(), nullable=True))
-        batch_op.add_column(sa.Column('vip_activated_at', sa.DateTime(), nullable=True))
-        batch_op.add_column(sa.Column('membership_no', sa.String(length=30), nullable=True))
-        batch_op.add_column(sa.Column('qr_token', sa.String(length=64), nullable=True))
-        batch_op.create_unique_constraint('uq_user_email', ['email'])
-        batch_op.create_unique_constraint('uq_user_membership_no', ['membership_no'])
-        batch_op.create_unique_constraint('uq_user_qr_token', ['qr_token'])
+    # app.py runs db.create_all() on import, so a fresh database already has these.
+    if 'full_name' not in {c['name'] for c in sa.inspect(op.get_bind()).get_columns('user')}:
+        with op.batch_alter_table('user', schema=None) as batch_op:
+            batch_op.add_column(sa.Column('full_name', sa.String(length=150), nullable=True))
+            batch_op.add_column(sa.Column('email', sa.String(length=150), nullable=True))
+            batch_op.add_column(sa.Column('phone', sa.String(length=30), nullable=True))
+            batch_op.add_column(sa.Column('created_at', sa.DateTime(), nullable=True))
+            batch_op.add_column(sa.Column('is_vip', sa.Boolean(), nullable=False, server_default=sa.false()))
+            batch_op.add_column(sa.Column('vip_status', sa.String(length=20), nullable=False, server_default='none'))
+            batch_op.add_column(sa.Column('vip_requested_at', sa.DateTime(), nullable=True))
+            batch_op.add_column(sa.Column('vip_activated_at', sa.DateTime(), nullable=True))
+            batch_op.add_column(sa.Column('membership_no', sa.String(length=30), nullable=True))
+            batch_op.add_column(sa.Column('qr_token', sa.String(length=64), nullable=True))
+            batch_op.create_unique_constraint('uq_user_email', ['email'])
+            batch_op.create_unique_constraint('uq_user_membership_no', ['membership_no'])
+            batch_op.create_unique_constraint('uq_user_qr_token', ['qr_token'])
 
     # ### end Alembic commands ###
 

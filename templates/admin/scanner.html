@@ -1,180 +1,166 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Scanner | IYDP Admin</title>
-    {% include 'admin/partials/head_assets.html' %}
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <style>
-        #qr-reader { border-radius: 1.5rem; overflow: hidden; }
-        #qr-reader video { border-radius: 1.5rem; }
-        .flash-ok { animation: flashGreen 1s ease; }
-        .flash-warn { animation: flashAmber 1s ease; }
-        .flash-bad { animation: flashRed 1s ease; }
-        @keyframes flashGreen { 0% { background: #dcfce7; } 100% { background: #ffffff; } }
-        @keyframes flashAmber { 0% { background: #fef9c3; } 100% { background: #ffffff; } }
-        @keyframes flashRed { 0% { background: #fee2e2; } 100% { background: #ffffff; } }
-    </style>
-</head>
-<body class="antialiased p-3 lg:p-6">
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% block title %}QR scanner{% endblock %}
 
-    <div class="flex flex-col lg:flex-row min-h-screen gap-6">
-        {% include 'admin/partials/sidebar.html' %}
-        <main class="flex-1 lg:pr-4">
-            <header class="mb-8 px-4">
-                <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">QR Scanner</h2>
-                <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">Scan a VIP card to record attendance</p>
-            </header>
+{% block head %}
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+    #qr-reader { border: 0 !important; }
+    #qr-reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+    #qr-reader img[alt="Info icon"], #qr-reader__dashboard_section_csr span { display: none !important; }
+    @keyframes pop { 0% { transform: scale(.97); } 60% { transform: scale(1.01); } 100% { transform: scale(1); } }
+    .pop { animation: pop .35s ease; }
+</style>
+{% endblock %}
 
-            {% if not events %}
-            <div class="mx-4 rounded-panel p-10 text-center">
-                <i class="fas fa-calendar-xmark text-3xl text-slate-300 mb-4"></i>
-                <p class="text-slate-500 font-bold">Create an active <a href="{{ url_for('add_event') }}" class="text-[#6f3d90] underline">event</a> before scanning.</p>
+{% block content %}
+{% call ui.page_header('QR scanner', 'Scan member cards at the entrance', icon_name='qr-code', color='text-iblue') %}{% endcall %}
+
+{% if not events %}
+<div class="card">
+    {{ ui.empty('No open events', 'Create an event, or reopen one, before scanning.', action=url_for('add_event'), action_label='New event') }}
+</div>
+{% else %}
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-2 [&>*]:min-w-0">
+    <div class="space-y-4">
+        <div>
+            <label for="event-select" class="label">Event</label>
+            <select id="event-select" class="input pr-10">
+                {% for e in events %}
+                <option value="{{ e.id }}">{{ e.name }}{% if e.starts_at %} · {{ e.starts_at|datetimeformat('%d %b') }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="relative aspect-square w-full overflow-hidden rounded-xl bg-slate-900">
+            <div id="qr-reader" class="absolute inset-0"></div>
+            <div id="camera-idle" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-slate-400">
+                {{ ui.icon('camera', 'h-7 w-7') }}
+                <p class="text-sm">Camera is off</p>
             </div>
-            {% else %}
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 px-4 pb-10">
-                <div class="rounded-panel p-8">
-                    <label for="event-select" class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Event</label>
-                    <select id="event-select" class="input-field mt-2 mb-6 text-sm font-bold text-slate-700">
-                        {% for e in events %}
-                        <option value="{{ e.id }}">{{ e.name }}</option>
-                        {% endfor %}
-                    </select>
+        </div>
 
-                    <div id="qr-reader" class="w-full"></div>
-
-                    <div class="flex gap-3 mt-6">
-                        <button id="start-btn" class="btn-save flex-1 py-4 text-xs"><i class="fas fa-camera mr-2"></i> Start Camera</button>
-                        <button id="stop-btn" class="btn-cancel flex-1 py-4 text-xs hidden"><i class="fas fa-stop mr-2"></i> Stop</button>
-                    </div>
-                    <p class="text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-widest text-center">Requires browser camera permission and HTTPS</p>
-                </div>
-
-                <div class="space-y-6">
-                    <div id="result-panel" class="rounded-panel p-10 flex flex-col items-center justify-center text-center min-h-[220px] transition-all">
-                        <i id="result-icon" class="fas fa-qrcode text-5xl text-slate-200 mb-4"></i>
-                        <p id="result-title" class="text-lg font-black text-slate-400 uppercase">Waiting for scan</p>
-                        <p id="result-subtitle" class="text-sm text-slate-400 font-semibold mt-1"></p>
-                    </div>
-
-                    <div class="rounded-panel overflow-hidden">
-                        <div class="px-8 py-5 border-b border-slate-50 bg-slate-50/30">
-                            <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">Recent Scans</h3>
-                        </div>
-                        <ul id="recent-list" class="divide-y divide-slate-50 max-h-80 overflow-y-auto">
-                            <li class="px-8 py-8 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No scans yet</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-        </main>
+        <button id="start-btn" type="button" class="btn btn-primary btn-lg w-full">{{ ui.icon('camera', 'h-4 w-4') }} Start camera</button>
+        <button id="stop-btn" type="button" class="btn btn-secondary btn-lg hidden w-full">{{ ui.icon('square', 'h-4 w-4') }} Stop camera</button>
+        <p class="text-center text-[13px] text-slate-500">Needs camera permission. Works only over HTTPS.</p>
     </div>
 
+    <div class="space-y-4">
+        <div id="result-panel" class="card flex min-h-[120px] items-center gap-4 p-5" role="status" aria-live="polite">
+            <span id="result-icon" class="shrink-0 text-slate-400">{{ ui.icon('qr-code', 'h-10 w-10') }}</span>
+            <div class="min-w-0">
+                <p id="result-title" class="text-base font-semibold text-slate-500">Waiting for a scan</p>
+                <p id="result-subtitle" class="mt-0.5 text-sm text-slate-500">Point the camera at a member’s card.</p>
+            </div>
+        </div>
+
+        <section class="card overflow-hidden" aria-labelledby="recent-heading">
+            <div class="card-header"><h2 id="recent-heading" class="card-title">This session</h2><span id="recent-count" class="text-xs text-slate-500"></span></div>
+            <ul id="recent-list" class="max-h-80 divide-y divide-slate-100 overflow-y-auto">
+                <li class="px-4 py-8 text-center text-sm text-slate-500 sm:px-5">No scans yet</li>
+            </ul>
+        </section>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
 <script>
-(function() {
-    const startBtn = document.getElementById('start-btn');
-    const stopBtn = document.getElementById('stop-btn');
-    const eventSelect = document.getElementById('event-select');
-    const resultPanel = document.getElementById('result-panel');
-    const resultIcon = document.getElementById('result-icon');
-    const resultTitle = document.getElementById('result-title');
-    const resultSubtitle = document.getElementById('result-subtitle');
-    const recentList = document.getElementById('recent-list');
-
+(function () {
+    var startBtn = document.getElementById('start-btn');
     if (!startBtn) return;
+    var stopBtn = document.getElementById('stop-btn');
+    var eventSelect = document.getElementById('event-select');
+    var idle = document.getElementById('camera-idle');
+    var panel = document.getElementById('result-panel');
+    var icon = document.getElementById('result-icon');
+    var ICONS = {
+        ok: {{ ui.icon('circle-check', 'h-10 w-10')|string|tojson }},
+        warn: {{ ui.icon('triangle-alert', 'h-10 w-10')|string|tojson }},
+        bad: {{ ui.icon('circle-x', 'h-10 w-10')|string|tojson }}
+    };
+    var title = document.getElementById('result-title');
+    var subtitle = document.getElementById('result-subtitle');
+    var recentList = document.getElementById('recent-list');
+    var recentCount = document.getElementById('recent-count');
 
-    let html5QrCode = null;
-    let busy = false;
-    let recentCount = 0;
+    var scanner = null, busy = false, count = 0;
 
-    function setResult(kind, title, subtitle) {
-        resultPanel.classList.remove('flash-ok', 'flash-warn', 'flash-bad');
-        void resultPanel.offsetWidth;
-        const config = {
-            ok: { icon: 'fa-circle-check', color: 'text-[#7dba4e]', flash: 'flash-ok' },
-            duplicate: { icon: 'fa-triangle-exclamation', color: 'text-yellow-500', flash: 'flash-warn' },
-            not_vip: { icon: 'fa-circle-xmark', color: 'text-[#f06e60]', flash: 'flash-bad' },
-            invalid: { icon: 'fa-circle-xmark', color: 'text-[#f06e60]', flash: 'flash-bad' },
-        }[kind];
-        resultIcon.className = `fas ${config.icon} text-5xl ${config.color} mb-4`;
-        resultTitle.className = `text-lg font-black uppercase ${config.color}`;
-        resultTitle.textContent = title;
-        resultSubtitle.textContent = subtitle || '';
-        resultPanel.classList.add(config.flash);
+    var KINDS = {
+        ok:        { icon: 'ok',   color: 'text-igreen-dark', panel: 'border-igreen bg-igreen-soft', label: 'Checked in',         badge: 'badge-green', vibrate: [60] },
+        duplicate: { icon: 'warn', color: 'text-iblue-dark',  panel: 'border-iblue bg-iblue-soft',   label: 'Already checked in', badge: 'badge-blue',  vibrate: [60, 60, 60] },
+        invalid:   { icon: 'bad',  color: 'text-ired-dark',   panel: 'border-ired bg-ired-soft',     label: 'Not recognised',     badge: 'badge-red',   vibrate: [200] }
+    };
+
+    function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+
+    function setResult(kind, heading, sub) {
+        var k = KINDS[kind] || KINDS.invalid;
+        icon.className = 'shrink-0 ' + k.color;
+        icon.innerHTML = ICONS[k.icon];
+        panel.className = 'card flex min-h-[120px] items-center gap-4 p-5 ' + k.panel;
+        title.className = 'text-base font-semibold ' + k.color;
+        title.textContent = heading;
+        subtitle.textContent = sub || '';
+        void panel.offsetWidth; panel.classList.add('pop');
+        if (navigator.vibrate) navigator.vibrate(k.vibrate);
     }
 
-    function prependRecent(kind, name, time) {
-        if (recentCount === 0) recentList.innerHTML = '';
-        recentCount += 1;
-        const labelMap = { ok: 'Checked in', duplicate: 'Already checked in', not_vip: 'Not VIP', invalid: 'Not recognized' };
-        const colorMap = { ok: 'text-[#7dba4e]', duplicate: 'text-yellow-500', not_vip: 'text-[#f06e60]', invalid: 'text-[#f06e60]' };
-        const li = document.createElement('li');
-        li.className = 'px-8 py-4 flex items-center justify-between';
-        li.innerHTML = `
-            <div>
-                <div class="text-sm font-black text-slate-900">${name || 'Unknown'}</div>
-                <div class="text-[10px] font-bold ${colorMap[kind]} uppercase">${labelMap[kind]}</div>
-            </div>
-            <div class="text-xs font-bold text-slate-400">${time || ''}</div>
-        `;
+    function addRecent(kind, name, time) {
+        var k = KINDS[kind] || KINDS.invalid;
+        if (count === 0) recentList.innerHTML = '';
+        count += 1;
+        recentCount.textContent = count + (count === 1 ? ' scan' : ' scans');
+        var li = document.createElement('li');
+        li.className = 'flex items-center gap-3 px-4 py-3 sm:px-5';
+        li.innerHTML = '<span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium text-slate-900">' + esc(name || 'Unknown') + '</span>' +
+                       '<span class="badge ' + k.badge + ' mt-1">' + k.label + '</span></span>' +
+                       '<span class="shrink-0 text-xs text-slate-500">' + esc(time || '') + '</span>';
         recentList.prepend(li);
     }
 
-    async function onScanSuccess(decodedText) {
+    async function onScan(text) {
         if (busy) return;
         busy = true;
-
         try {
-            const resp = await fetch('{{ url_for("scanner_checkin") }}', {
+            var resp = await fetch('{{ url_for("scanner_checkin") }}', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
-                body: JSON.stringify({ event_id: eventSelect.value, code: decodedText }),
+                body: JSON.stringify({ event_id: eventSelect.value, code: text })
             });
-            const data = await resp.json();
-
-            if (data.status === 'ok') {
-                setResult('ok', data.name || 'Checked in', `${data.time} · ${data.membership_no || ''}`);
-            } else if (data.status === 'duplicate') {
-                setResult('duplicate', data.name || 'Already checked in', `${data.time} · ${data.membership_no || ''}`);
-            } else if (data.status === 'not_vip') {
-                setResult('not_vip', data.name || 'Not a VIP member', 'This person does not have an active VIP membership.');
-            } else {
-                setResult('invalid', 'Code not recognized', data.message || '');
-            }
-            prependRecent(data.status, data.name, data.time);
+            var data = await resp.json();
+            var meta = [data.card ? data.card + ' card' : null, data.membership_no, data.registered === false ? 'not registered' : null].filter(Boolean).join(' · ');
+            if (data.status === 'ok') setResult('ok', data.name || 'Checked in', meta);
+            else if (data.status === 'duplicate') setResult('duplicate', (data.name || 'Member') + ' is already in', 'Checked in at ' + (data.time || ''));
+            else setResult('invalid', 'Code not recognised', data.message || '');
+            addRecent(data.status, data.name, data.time);
         } catch (e) {
-            setResult('invalid', 'Network error', 'Please try again.');
+            setResult('invalid', 'Connection problem', 'Check the internet and scan again.');
         }
-
-        setTimeout(() => { busy = false; }, 1800);
+        setTimeout(function () { busy = false; }, 1800);
     }
 
-    startBtn.addEventListener('click', async function() {
-        html5QrCode = new Html5Qrcode('qr-reader');
+    startBtn.addEventListener('click', async function () {
+        startBtn.disabled = true;
+        scanner = scanner || new Html5Qrcode('qr-reader');
         try {
-            await html5QrCode.start(
-                { facingMode: 'environment' },
-                { fps: 10, qrbox: { width: 260, height: 260 } },
-                onScanSuccess
-            );
+            await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: function (w, h) { var s = Math.floor(Math.min(w, h) * 0.7); return { width: s, height: s }; } }, onScan);
+            idle.classList.add('hidden');
             startBtn.classList.add('hidden');
             stopBtn.classList.remove('hidden');
         } catch (err) {
-            setResult('invalid', 'Camera access denied', 'Check your browser permissions.');
+            setResult('invalid', 'Camera not available', 'Allow camera access in the browser settings and try again.');
         }
+        startBtn.disabled = false;
     });
 
-    stopBtn.addEventListener('click', async function() {
-        if (html5QrCode) {
-            await html5QrCode.stop();
-            await html5QrCode.clear();
-        }
+    stopBtn.addEventListener('click', async function () {
+        if (scanner) { try { await scanner.stop(); scanner.clear(); } catch (e) {} }
+        idle.classList.remove('hidden');
         stopBtn.classList.add('hidden');
         startBtn.classList.remove('hidden');
     });
 })();
 </script>
-</body>
-</html>
+{% endblock %}

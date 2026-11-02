@@ -7,10 +7,20 @@ venv/
 
 # Environment
 .env
+.env.*
+!.env.example
 
 # Database (created automatically on first run / migration)
 instance/*.db
 instance/*.db-journal
+instance/*.db-wal
+instance/*.db-shm
+*.pem
+*.key
+*.log
+
+# Images uploaded through the admin panel (stories) live on the server only
+static/uploads/
 *.sqbpro
 
 # Node / frontend build

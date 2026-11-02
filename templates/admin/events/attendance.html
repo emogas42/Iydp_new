@@ -1,73 +1,58 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ event.name }} — Attendance | IYDP Admin</title>
-    {% include 'admin/partials/head_assets.html' %}
-</head>
-<body class="antialiased p-3 lg:p-6">
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% block title %}{{ event.name }}{% endblock %}
 
-    <div class="flex flex-col lg:flex-row min-h-screen gap-6">
-        {% include 'admin/partials/sidebar.html' %}
-        <main class="flex-1 lg:pr-4">
-            <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6 px-4">
-                <div>
-                    <a href="{{ url_for('list_events') }}" class="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-[#6f3d90]"><i class="fas fa-arrow-left mr-2"></i>Back to Events</a>
-                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase mt-2">{{ event.name }}</h2>
-                    <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">{{ event.starts_at|az_time('%d %b, %Y %H:%M') if event.starts_at else '' }} {{ '· ' ~ event.location if event.location }}</p>
-                </div>
-                <div class="flex gap-3">
-                    <a href="{{ url_for('export_event_attendance', id=event.id) }}" class="btn-cancel px-6 py-3 text-[10px]"><i class="fas fa-file-csv mr-2"></i> CSV Export</a>
-                    <a href="{{ url_for('scanner') }}" class="btn-action px-6 py-3 text-[10px]"><i class="fas fa-qrcode mr-2"></i> Open Scanner</a>
-                </div>
-            </header>
+{% block content %}
+{% set subtitle = [event.starts_at|datetimeformat('%d %b %Y, %H:%M') if event.starts_at else None, event.location]|select|join(' · ') %}
+{% call ui.page_header(event.name, subtitle or None, back=url_for('list_events'), back_label='Events', icon_name='calendar-days', color='text-ired') %}
+    <a href="{{ url_for('edit_event', id=event.id) }}" class="btn btn-secondary">{{ ui.icon('pencil') }} Edit</a>
+    {% if event.is_active %}
+    <a href="{{ url_for('scanner') }}" class="btn btn-primary">{{ ui.icon('qr-code') }} Scan</a>
+    {% endif %}
+{% endcall %}
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10 px-4">
-                <div class="rounded-panel stat-card p-8" style="border-bottom-color: var(--iydp-blue);">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Checked In</p>
-                    <h3 class="text-5xl font-black text-slate-900 tracking-tighter">{{ attendances|length }}</h3>
-                </div>
-                <div class="rounded-panel stat-card p-8" style="border-bottom-color: var(--iydp-purple);">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Total Active VIP</p>
-                    <h3 class="text-5xl font-black text-slate-900 tracking-tighter">{{ total_vip }}</h3>
-                </div>
-                <div class="rounded-panel stat-card p-8" style="border-bottom-color: var(--iydp-green);">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Attendance Rate</p>
-                    <h3 class="text-5xl font-black text-slate-900 tracking-tighter">{{ ((attendances|length / total_vip * 100) if total_vip else 0)|round(0, 'floor')|int }}%</h3>
-                </div>
-            </div>
+{% if not event.is_public %}
+<p class="card mb-4 px-4 py-3 text-sm text-slate-600">This event is hidden from the website. Turn on “Show on website” in Edit to open registration.</p>
+{% endif %}
 
-            <div class="rounded-panel overflow-hidden shadow-sm mx-4">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">
-                                <th class="px-8 py-5">Member</th>
-                                <th class="px-8 py-5">Membership No.</th>
-                                <th class="px-8 py-5">Checked in</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-50">
-                            {% for a in attendances %}
-                            <tr class="hover:bg-slate-50/80 transition-all">
-                                <td class="px-8 py-5">
-                                    <div class="text-sm font-black text-slate-900">{{ a.user.full_name or a.user.username }}</div>
-                                    <div class="text-[10px] text-slate-400">{{ a.user.email or '' }}</div>
-                                </td>
-                                <td class="px-8 py-5 text-xs font-bold text-slate-500">{{ a.user.membership_no or '—' }}</td>
-                                <td class="px-8 py-5 text-xs font-bold text-slate-500">{{ a.checked_in_at|az_time if a.checked_in_at else '—' }}</td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="3" class="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No one has checked in yet</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </main>
+<section class="mb-6 grid grid-cols-3 gap-3" aria-label="Summary">
+    {% for label, value in [
+        ('Registered', event.registrations|length),
+        ('Checked in', event.attendances|length),
+        ('Seats left', event.spots_left if event.capacity else 'No limit'),
+    ] %}
+    <div class="card p-3.5 sm:p-4">
+        <p class="text-xs font-medium text-slate-500 sm:text-[13px]">{{ label }}</p>
+        <p class="mt-1 font-bold tabular-nums text-ink {{ 'text-xl sm:text-2xl' if value is number else 'text-base sm:text-lg' }}">{{ value }}</p>
     </div>
-</body>
-</html>
+    {% endfor %}
+</section>
+
+<div class="card overflow-hidden">
+    <div class="card-header">
+        <h2 class="card-title">People</h2>
+        {% if people %}
+        <a href="{{ url_for('export_event_attendance', id=event.id) }}" class="link inline-flex items-center gap-1 text-sm">{{ ui.icon('download', 'h-3.5 w-3.5') }} CSV</a>
+        {% endif %}
+    </div>
+    {% if people %}
+    <ul class="divide-y divide-slate-100">
+        {% for user, registered_at, checked_in_at in people %}
+        <li>
+            <a href="{{ url_for('view_member', id=user.id) }}" class="list-row">
+                {{ ui.initials_avatar(user.display_name) }}
+                <span class="min-w-0 flex-1">
+                    <span class="block truncate text-sm font-medium text-ink">{{ user.display_name }}</span>
+                    <span class="block truncate text-xs text-slate-500">{{ user.card_label }} · {{ user.membership_no or user.email or '' }}</span>
+                </span>
+                {% if checked_in_at %}<span class="badge badge-green">In{% if not registered_at %}, walk-in{% endif %}</span>
+                {% else %}<span class="badge badge-slate">Registered</span>{% endif %}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    {{ ui.empty('No one yet', 'People who register on the website or get scanned at the entrance appear here.') }}
+    {% endif %}
+</div>
+{% endblock %}

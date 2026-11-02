@@ -1,0 +1,210 @@
+{#- Shared shell for every signed-in admin page.
+    Phones get a top bar, a bottom tab bar and a slide-in menu; desktops get a fixed sidebar. -#}
+{% from 'admin/_icons.html' import icon %}
+{% set endpoint = request.endpoint or '' %}
+{% set unread = unread_count or 0 %}
+{% set pending_vip = pending_vip_count or 0 %}
+{% set pending_applications = pending_applications_count or 0 %}
+{% set nav_groups = [
+    (None, [
+        ('admin_dashboard', 'Dashboard', 'house', ['admin_dashboard'], 0, 'text-iblue'),
+    ]),
+    ('Content', [
+        ('list_news', 'News', 'newspaper', ['list_news', 'add_news', 'edit_news'], 0, 'text-igreen'),
+        ('list_stories', 'Stories', 'book-open', ['list_stories', 'add_story', 'edit_story'], 0, 'text-ipurple'),
+        ('list_opportunities', 'Projects', 'briefcase', ['list_opportunities', 'add_opportunity', 'edit_opportunity'], 0, 'text-ired'),
+        ('list_applications', 'Applications', 'clipboard-list', ['list_applications', 'view_application'], pending_applications, 'text-ired'),
+    ]),
+    ('People', [
+        ('list_messages', 'Messages', 'mail', ['list_messages', 'view_message'], unread, 'text-iblue'),
+        ('list_members', 'Members', 'users', ['list_members', 'view_member'], 0, 'text-igreen'),
+        ('list_vip_requests', 'VIP requests', 'crown', ['list_vip_requests'], pending_vip, 'text-ipurple'),
+    ]),
+    ('Events', [
+        ('list_events', 'Events', 'calendar-days', ['list_events', 'add_event', 'edit_event', 'event_attendance'], 0, 'text-ired'),
+        ('scanner', 'QR scanner', 'qr-code', ['scanner'], 0, 'text-iblue'),
+    ]),
+] %}
+{% set tabs = [
+    ('admin_dashboard', 'Home', 'house', ['admin_dashboard'], 0),
+    ('list_messages', 'Messages', 'mail', ['list_messages', 'view_message'], unread),
+    ('scanner', 'Scan', 'qr-code', ['scanner'], 0),
+    ('list_members', 'Members', 'users', ['list_members', 'view_member'], 0),
+] %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#ffffff">
+    <title>{% block title %}Admin{% endblock %} · IYDP Admin</title>
+    {% include 'admin/partials/head_assets.html' %}
+    {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen bg-slate-50 font-sans text-[15px] text-ink antialiased">
+
+    {%- macro nav_link(ep, label, icon_name, active_eps, badge, color='text-slate-400') -%}
+        {% set active = endpoint in active_eps %}
+        <a href="{{ url_for(ep) }}"
+           class="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors
+                  {{ 'bg-iblue-soft font-semibold text-ink' if active else 'font-medium text-slate-600 hover:bg-slate-100 hover:text-ink' }}"
+           {% if active %}aria-current="page"{% endif %}>
+            {{ icon(icon_name, 'h-[18px] w-[18px] ' ~ color) }}
+            <span class="flex-1">{{ label }}</span>
+            {% if badge %}<span class="min-w-[1.4rem] rounded-full bg-ired px-1.5 py-0.5 text-center text-[11px] font-bold leading-none text-white">{{ badge }}</span>{% endif %}
+        </a>
+    {%- endmacro -%}
+
+    {%- macro nav_body() -%}
+        <nav class="flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label="Admin">
+            {% for heading, items in nav_groups %}
+            <div>
+                {% if heading %}<p class="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{{ heading }}</p>{% endif %}
+                <div class="space-y-0.5">
+                    {% for ep, label, icon_name, active_eps, badge, color in items %}{{ nav_link(ep, label, icon_name, active_eps, badge, color) }}{% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </nav>
+        <div class="space-y-0.5 border-t border-slate-200 px-3 py-3">
+            {{ nav_link('admin_settings', 'Settings', 'settings', ['admin_settings'], 0) }}
+            <a href="/" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-ink">
+                {{ icon('globe', 'h-[18px] w-[18px] text-slate-400') }}
+                <span>View website</span>
+            </a>
+            <a href="{{ url_for('logout') }}" class="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-ired-soft hover:text-ired-dark">
+                {{ icon('log-out', 'h-[18px] w-[18px] text-slate-400') }}
+                <span>Log out</span>
+            </a>
+        </div>
+    {%- endmacro -%}
+
+    <!-- Desktop sidebar -->
+    <aside class="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
+        <a href="{{ url_for('admin_dashboard') }}" class="flex h-16 shrink-0 items-center gap-2.5 border-b border-slate-200 px-6">
+            <img src="{{ url_for('static', filename='logo-trim.png') }}" alt="IYDP" class="h-9 w-auto">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Admin</span>
+        </a>
+        {{ nav_body() }}
+    </aside>
+
+    <!-- Mobile top bar -->
+    <header class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4 lg:hidden">
+        <a href="{{ url_for('admin_dashboard') }}" class="shrink-0" aria-label="Dashboard">
+            <img src="{{ url_for('static', filename='logo-trim.png') }}" alt="IYDP" class="h-7 w-auto">
+        </a>
+        <p class="min-w-0 flex-1 truncate text-center text-sm font-semibold text-ink">{{ self.title() }}</p>
+        <button type="button" data-menu-open class="-mr-2 flex h-10 w-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100" aria-label="Open menu" aria-controls="mobile-menu" aria-expanded="false">
+            {{ icon('menu', 'h-6 w-6') }}
+        </button>
+    </header>
+
+    <!-- Mobile slide-in menu -->
+    <div id="mobile-menu" class="fixed inset-0 z-50 hidden lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+        <div data-menu-close data-menu-backdrop class="absolute inset-0 bg-ink/40 opacity-0 transition-opacity duration-200"></div>
+        <div data-menu-panel class="absolute inset-y-0 right-0 flex w-[82%] max-w-xs translate-x-full flex-col bg-white shadow-xl transition-transform duration-200 ease-out">
+            <div class="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 px-4">
+                <span class="text-sm font-semibold text-ink">Menu</span>
+                <button type="button" data-menu-close class="-mr-2 flex h-10 w-10 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100" aria-label="Close menu">
+                    {{ icon('x', 'h-6 w-6') }}
+                </button>
+            </div>
+            {{ nav_body() }}
+        </div>
+    </div>
+
+    <main class="lg:pl-64">
+        <div class="mx-auto w-full max-w-5xl px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-12 lg:pt-10">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="mb-5 space-y-2">
+                {% for category, message in messages %}
+                {% set tone = 'success' if category == 'success' else ('error' if category in ['danger', 'error'] else 'info') %}
+                <div class="flex items-start gap-3 rounded-md border bg-white px-4 py-3 text-sm text-ink
+                            {{ 'border-igreen' if tone == 'success' else ('border-ired' if tone == 'error' else 'border-iblue') }}"
+                     role="{{ 'alert' if tone == 'error' else 'status' }}">
+                    {{ icon('circle-check' if tone == 'success' else ('circle-alert' if tone == 'error' else 'info'),
+                            'mt-0.5 h-4 w-4 ' ~ ('text-igreen-dark' if tone == 'success' else ('text-ired-dark' if tone == 'error' else 'text-iblue-dark'))) }}
+                    <p class="flex-1">{{ message }}</p>
+                    <button type="button" class="-my-1 -mr-1 rounded p-1 text-slate-400 hover:text-ink" onclick="this.parentElement.remove()" aria-label="Dismiss">
+                        {{ icon('x') }}
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Mobile bottom tabs -->
+    <nav class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Quick navigation">
+        <div class="mx-auto grid max-w-md grid-cols-5">
+            {% for ep, label, icon_name, active_eps, badge in tabs %}
+            {% set active = endpoint in active_eps %}
+            <a href="{{ url_for(ep) }}" class="flex flex-col items-center gap-1 py-2.5 text-[11px] {{ 'font-semibold text-iblue-dark' if active else 'font-medium text-slate-500' }}" {% if active %}aria-current="page"{% endif %}>
+                <span class="relative">
+                    {{ icon(icon_name, 'h-[22px] w-[22px]') }}
+                    {% if badge %}<span class="absolute -right-2.5 -top-1.5 min-w-[1.1rem] rounded-full bg-ired px-1 text-center text-[10px] font-bold leading-[1.1rem] text-white">{{ badge }}</span>{% endif %}
+                </span>
+                {{ label }}
+            </a>
+            {% endfor %}
+            <button type="button" data-menu-open class="flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-slate-500" aria-controls="mobile-menu" aria-expanded="false">
+                <span class="relative">
+                    {{ icon('ellipsis', 'h-[22px] w-[22px]') }}
+                    {% if pending_vip or pending_applications %}<span class="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-ired"></span>{% endif %}
+                </span>
+                More
+            </button>
+        </div>
+    </nav>
+
+    <script>
+    (function () {
+        var menu = document.getElementById('mobile-menu');
+        var panel = menu.querySelector('[data-menu-panel]');
+        var backdrop = menu.querySelector('[data-menu-backdrop]');
+        var openers = document.querySelectorAll('[data-menu-open]');
+
+        function setExpanded(v) { openers.forEach(function (b) { b.setAttribute('aria-expanded', String(v)); }); }
+
+        function open() {
+            menu.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            requestAnimationFrame(function () {
+                panel.classList.remove('translate-x-full');
+                backdrop.classList.remove('opacity-0');
+            });
+            setExpanded(true);
+        }
+        function close() {
+            panel.classList.add('translate-x-full');
+            backdrop.classList.add('opacity-0');
+            document.body.style.overflow = '';
+            setExpanded(false);
+            setTimeout(function () { menu.classList.add('hidden'); }, 200);
+        }
+        openers.forEach(function (b) { b.addEventListener('click', open); });
+        menu.querySelectorAll('[data-menu-close]').forEach(function (b) { b.addEventListener('click', close); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.classList.contains('hidden')) close(); });
+
+        // Any form marked data-busy shows progress and blocks double submits.
+        var spinner = {{ icon('loader-circle', 'h-4 w-4 animate-spin')|string|tojson }};
+        document.querySelectorAll('form[data-busy]').forEach(function (form) {
+            form.addEventListener('submit', function () {
+                var btn = form.querySelector('[type=submit][data-busy-label]') || form.querySelector('[type=submit]');
+                if (!btn) return;
+                setTimeout(function () {
+                    btn.disabled = true;
+                    btn.innerHTML = spinner + ' ' + (btn.dataset.busyLabel || 'Saving…');
+                }, 0);
+            });
+        });
+    })();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

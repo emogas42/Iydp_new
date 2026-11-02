@@ -8,21 +8,43 @@ async function request(url) {
   return res.json()
 }
 
+async function post(url, body) {
+  const res = await csrfFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const error = new Error(data.error || 'Something went wrong. Please try again.')
+    error.status = res.status
+    throw error
+  }
+  return data
+}
+
 export const api = {
   // Homepage combined data
   getHome: () => request(`${API}/home`),
 
-  // Opportunities
-  getOpportunities: (params = '') => request(`${API}/opportunities?${params}`),
-  getOpportunity: (id) => request(`${API}/opportunity/${id}`),
+  // Projects
+  getProjects: (params = '') => request(`${API}/projects?${params}`),
+  getProject: (id) => request(`${API}/projects/${id}`),
+  applyToProject: (id, form) => post(`${API}/projects/${id}/apply`, form),
+
+  // Events
+  getEvents: (params = '') => request(`${API}/events?${params}`),
+  getEvent: (id) => request(`${API}/events/${id}`),
+  registerForEvent: (id) => post(`${API}/events/${id}/register`),
+  unregisterFromEvent: (id) => post(`${API}/events/${id}/unregister`),
 
   // News
   getNews: (params = '') => request(`${API}/news?${params}`),
   getNewsDetail: (id) => request(`${API}/news/${id}`),
 
-  // Blog / Stories
-  getBlog: (params = '') => request(`${API}/blog?${params}`),
-  getBlogPost: (slug) => request(`${API}/blog/${slug}`),
+  // Participant stories
+  getStories: (params = '') => request(`${API}/stories?${params}`),
+  getStory: (slug) => request(`${API}/stories/${encodeURIComponent(slug)}`),
 
   // Contact
   submitContact: (formData) =>

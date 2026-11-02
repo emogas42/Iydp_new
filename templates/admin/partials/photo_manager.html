@@ -1,0 +1,142 @@
+{#- Photo gallery field: reorder and remove saved photos, add new ones.
+    Submits photo_order, remove_photos and photos; the form needs enctype="multipart/form-data". -#}
+{% from 'admin/_icons.html' import icon %}
+
+{% macro head() %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<style>
+    .photo-tile { position: relative; aspect-ratio: 4 / 3; border-radius: .5rem; overflow: hidden; background: #f1f5f9; }
+    .photo-tile img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+    .photo-tile.is-removed img { opacity: .25; filter: grayscale(1); }
+    .photo-tile .tile-btn { position: absolute; top: .375rem; right: .375rem; width: 2rem; height: 2rem; border-radius: 9999px; background: rgba(255,255,255,.95); color: #334155; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(15,23,42,.2); }
+    .photo-tile .cover-badge { position: absolute; left: .375rem; bottom: .375rem; background: rgba(15,23,42,.8); color: #fff; font-size: 11px; font-weight: 600; padding: .125rem .5rem; border-radius: 9999px; }
+    .sortable-ghost { opacity: .35; }
+    #existing-photos .photo-tile { cursor: grab; touch-action: none; }
+    .dropzone.is-over { border-color: #00aef6; background: #e6f7fe; }
+</style>
+{% endmacro %}
+
+{% macro fields(photos, show_cover=True) %}
+{% if photos %}
+<input type="hidden" name="photo_order" id="photo-order" value="{{ photos|map(attribute='id')|join(',') }}">
+<p class="text-[13px] text-slate-500">Drag to reorder. Tap the bin to remove.</p>
+<div id="existing-photos" class="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+    {% for photo in photos %}
+    <div class="photo-tile" data-id="{{ photo.id }}">
+        <img src="{{ photo.path }}" alt="" draggable="false">
+        <input type="checkbox" name="remove_photos" value="{{ photo.id }}" class="hidden remove-input">
+        <button type="button" class="tile-btn toggle-remove" aria-label="Remove photo">{{ icon('trash-2') }}</button>
+        {% if show_cover %}<span class="cover-badge {{ '' if loop.first else 'hidden' }}">Cover</span>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<label id="dropzone" for="photos" class="dropzone flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-slate-300 px-4 py-8 text-center transition-colors hover:border-iblue hover:bg-iblue-soft">
+    {{ icon('images', 'mb-1 h-6 w-6 text-iblue') }}
+    <span class="text-sm font-medium text-slate-800">{{ 'Add more photos' if photos else 'Add photos' }}</span>
+    <span class="text-[13px] text-slate-500">Tap to choose or drop files · JPG, PNG, WebP</span>
+</label>
+<input type="file" name="photos" id="photos" accept="image/jpeg,image/png,image/webp" multiple class="sr-only">
+<div id="new-photos" class="!mt-3 grid grid-cols-3 gap-2 empty:hidden sm:grid-cols-4 lg:grid-cols-5"></div>
+{% endmacro %}
+
+{% macro script() %}
+<script>
+(function () {
+    var ICON_TRASH = {{ icon('trash-2')|string|tojson }};
+    var ICON_UNDO = {{ icon('rotate-ccw')|string|tojson }};
+    var ICON_X = {{ icon('x')|string|tojson }};
+
+    var existing = document.getElementById('existing-photos');
+    if (existing) {
+        var orderInput = document.getElementById('photo-order');
+        var syncOrder = function () {
+            var tiles = existing.querySelectorAll('.photo-tile');
+            orderInput.value = Array.prototype.map.call(tiles, function (t) { return t.dataset.id; }).join(',');
+            var coverShown = false;
+            tiles.forEach(function (t) {
+                var removed = t.classList.contains('is-removed');
+                var badge = t.querySelector('.cover-badge');
+                if (badge) badge.classList.toggle('hidden', coverShown || removed);
+                if (!removed) coverShown = true;
+            });
+        };
+        Sortable.create(existing, { animation: 180, ghostClass: 'sortable-ghost', delay: 120, delayOnTouchOnly: true, filter: '.tile-btn', preventOnFilter: false, onEnd: syncOrder });
+        existing.addEventListener('click', function (e) {
+            var btn = e.target.closest('.toggle-remove');
+            if (!btn) return;
+            var tile = btn.closest('.photo-tile');
+            var input = tile.querySelector('.remove-input');
+            input.checked = !input.checked;
+            tile.classList.toggle('is-removed', input.checked);
+            btn.setAttribute('aria-label', input.checked ? 'Keep photo' : 'Remove photo');
+            btn.innerHTML = input.checked ? ICON_UNDO : ICON_TRASH;
+            syncOrder();
+        });
+    }
+
+    var photosInput = document.getElementById('photos');
+    var dropzone = document.getElementById('dropzone');
+    var grid = document.getElementById('new-photos');
+    var picked = [];
+
+    function render() {
+        var dt = new DataTransfer();
+        picked.forEach(function (f) { dt.items.add(f); });
+        photosInput.files = dt.files;
+        grid.innerHTML = '';
+        picked.forEach(function (file, i) {
+            var tile = document.createElement('div');
+            tile.className = 'photo-tile';
+            var img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.alt = '';
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'tile-btn';
+            btn.setAttribute('aria-label', 'Remove photo');
+            btn.innerHTML = ICON_X;
+            btn.addEventListener('click', function () { picked.splice(i, 1); render(); });
+            tile.appendChild(img);
+            tile.appendChild(btn);
+            grid.appendChild(tile);
+        });
+    }
+    function addFiles(files) {
+        Array.prototype.forEach.call(files, function (f) {
+            if (/^image\/(jpeg|png|webp)$/.test(f.type)) picked.push(f);
+        });
+        render();
+    }
+    photosInput.addEventListener('change', function () { addFiles(photosInput.files); });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+        dropzone.addEventListener(ev, function (e) { e.preventDefault(); dropzone.classList.add('is-over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+        dropzone.addEventListener(ev, function (e) { e.preventDefault(); dropzone.classList.remove('is-over'); });
+    });
+    dropzone.addEventListener('drop', function (e) { addFiles(e.dataTransfer.files); });
+})();
+</script>
+{% endmacro %}
+
+{#- Single poster: preview, replace, remove. -#}
+{% macro poster_field(path, hint) %}
+<div>
+    <label for="poster" class="label">Poster <span class="optional">Optional</span></label>
+    <div class="flex items-start gap-4">
+        <img id="poster-preview" src="{{ path or '' }}" alt="" class="aspect-[4/5] w-28 shrink-0 rounded-md border border-slate-200 object-cover {{ '' if path else 'hidden' }}">
+        <div class="min-w-0 flex-1">
+            <input type="file" id="poster" name="poster" accept="image/jpeg,image/png,image/webp" class="block w-full text-sm text-slate-600 file:mr-3 file:h-10 file:cursor-pointer file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:text-sm file:font-semibold file:text-slate-700"
+                   onchange="var i=document.getElementById('poster-preview');if(this.files[0]){i.src=URL.createObjectURL(this.files[0]);i.classList.remove('hidden');}">
+            <p class="hint">{{ hint }}</p>
+            {% if path %}
+            <label class="mt-2 flex cursor-pointer items-center gap-1.5 text-[13px] text-slate-500">
+                <input type="checkbox" name="remove_poster" value="1" class="rounded border-slate-300"> Remove poster
+            </label>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endmacro %}

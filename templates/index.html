@@ -326,7 +326,7 @@
 
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 fade-up">
                 {% for post in posts[:3] %}
-                <a href="{{ url_for('blog_post', slug=post.slug) }}" class="story-card group block bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                <a href="/stories/{{ post.slug }}" class="story-card group block bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
                     {% if post.image_url %}
                     <div class="h-48 overflow-hidden">
                         <img src="{{ post.image_url }}" alt="{{ post.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
@@ -362,7 +362,7 @@
             </div>
 
             <div class="text-center mt-10 fade-up">
-                <a href="{{ url_for('blog') }}" class="inline-flex items-center gap-2 border border-slate-200 text-slate-700 px-6 py-3 rounded-xl text-sm font-semibold hover:bg-slate-50 transition">
+                <a href="/stories" class="inline-flex items-center gap-2 border border-slate-200 text-slate-700 px-6 py-3 rounded-xl text-sm font-semibold hover:bg-slate-50 transition">
                     Read all stories <i class="fa-solid fa-arrow-right text-xs"></i>
                 </a>
             </div>

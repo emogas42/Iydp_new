@@ -1,0 +1,105 @@
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% import 'admin/partials/photo_manager.html' as photos_ui with context %}
+{% set editing = project is not none %}
+{% set v = form if form else {} %}
+{% block title %}{{ 'Edit project' if editing else 'New project' }}{% endblock %}
+{% block head %}{{ photos_ui.head() }}{% endblock %}
+
+{% block content %}
+{% call ui.page_header('Edit project' if editing else 'New project', 'Shown under Present or Finished Projects on the website', back=url_for('list_opportunities'), back_label='Projects', icon_name='briefcase', color='text-ired') %}
+    {% if editing %}
+    <a href="{{ url_for('list_applications', project=project.id) }}" class="btn btn-secondary">{{ ui.icon('clipboard-list') }} Applications ({{ project.applications|length }})</a>
+    {% if project.is_active %}
+    <a href="/projects/{{ project.id }}" target="_blank" rel="noopener" class="btn btn-secondary">{{ ui.icon('external-link') }} View on site</a>
+    {% endif %}
+    {% endif %}
+{% endcall %}
+
+<form method="POST" enctype="multipart/form-data" action="{{ url_for('edit_opportunity', id=project.id) if editing else url_for('add_opportunity') }}" class="space-y-5" data-busy>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {% call ui.section(1, 'Basics', 'What the project is and where it happens.') %}
+        <div>
+            <label for="title" class="label">Title <span class="required">*</span></label>
+            <input type="text" id="title" name="title" required maxlength="200" class="input" placeholder="e.g. Youth Exchange: Green Futures in Lisbon" value="{{ v.get('title', project.title if editing else '') }}">
+        </div>
+        <div>
+            <label for="location" class="label">Location <span class="optional">Optional</span></label>
+            <div class="input-icon">
+                {{ ui.icon('map-pin') }}
+                <input type="text" id="location" name="location" maxlength="100" class="input" placeholder="City, country" value="{{ v.get('location', (project.location or '') if editing else '') }}">
+            </div>
+            <p class="hint">Empty shows as “Remote”.</p>
+        </div>
+        <div>
+            <label for="tags" class="label">Tags <span class="optional">Optional</span></label>
+            <div class="input-icon">
+                {{ ui.icon('tag') }}
+                <input type="text" id="tags" name="tags" class="input" placeholder="Youth Exchange, Erasmus+, Portugal" value="{{ v.get('tags', project.tags|map(attribute='name')|join(', ') if editing else '') }}">
+            </div>
+            <p class="hint">Separate with commas. The first tag appears on the project card.</p>
+        </div>
+    {% endcall %}
+
+    {% call ui.section(2, 'Dates', 'The end date moves the project to Finished Projects automatically.') %}
+        <div class="grid gap-5 sm:grid-cols-3">
+            <div>
+                <label for="start_date" class="label">Starts <span class="optional">Optional</span></label>
+                <input type="date" id="start_date" name="start_date" class="input" value="{{ v.get('start_date', project.start_date.isoformat() if editing and project.start_date else '') }}">
+            </div>
+            <div>
+                <label for="end_date" class="label">Ends <span class="optional">Optional</span></label>
+                <input type="date" id="end_date" name="end_date" class="input" value="{{ v.get('end_date', project.end_date.isoformat() if editing and project.end_date else '') }}">
+            </div>
+            <div>
+                <label for="deadline" class="label">Application deadline <span class="optional">Optional</span></label>
+                <input type="date" id="deadline" name="deadline" class="input" value="{{ v.get('deadline', deadline|default('')) }}">
+            </div>
+        </div>
+        <div>
+            {% set mode = v.get('status_mode', project.status_mode if editing else 'auto') %}
+            <label for="status_mode" class="label">Website section</label>
+            <select id="status_mode" name="status_mode" class="input">
+                <option value="auto" {{ 'selected' if mode == 'auto' }}>Automatic, from the end date</option>
+                <option value="present" {{ 'selected' if mode == 'present' }}>Always Present</option>
+                <option value="finished" {{ 'selected' if mode == 'finished' }}>Finished</option>
+            </select>
+            <p class="hint">Use Finished for older projects that have no end date.</p>
+        </div>
+    {% endcall %}
+
+    {% call ui.section(3, 'Details', 'Explain the project and who can join. Leave an empty line between paragraphs.') %}
+        <div>
+            <label for="description" class="label">Description <span class="required">*</span></label>
+            <textarea id="description" name="description" required rows="8" class="input min-h-[180px] resize-y" placeholder="Topic, what participants will do, what is covered…">{{ v.get('description', project.description if editing else '') }}</textarea>
+        </div>
+        <div>
+            <label for="requirements" class="label">Who can apply <span class="optional">Optional</span></label>
+            <textarea id="requirements" name="requirements" rows="5" class="input min-h-[120px] resize-y" placeholder="Age limit, language level, country of residence…">{{ v.get('requirements', (project.requirements or '') if editing else '') }}</textarea>
+        </div>
+    {% endcall %}
+
+    {% call ui.section(4, 'Poster and photos', 'The poster appears on the project card. Photos appear as a gallery on the project page.') %}
+        {{ photos_ui.poster_field(project.poster_path if editing else None, 'A vertical image works best. JPG, PNG or WebP.') }}
+        {{ photos_ui.fields(project.photos if editing else [], show_cover=False) }}
+    {% endcall %}
+
+    {% set accepts = (v.get('accepts_applications') if v else (project.accepts_applications if editing else True)) %}
+    {% set active = (v.get('is_active') if v else (project.is_active if editing else True)) %}
+    {% call ui.section(5, 'Applications and visibility') %}
+        {{ ui.toggle('accepts_applications', 'Accept applications', 'Shows the application form until the deadline. People need an account to apply.', checked=accepts) }}
+        <div class="border-t border-slate-100 pt-5">
+            {{ ui.toggle('is_active', 'Show on website', 'Turn off to hide the project without deleting it.', checked=active) }}
+        </div>
+    {% endcall %}
+
+    {{ ui.form_actions('Save changes' if editing else 'Create project', url_for('list_opportunities'), busy_label='Uploading…') }}
+</form>
+
+{% if editing %}
+{{ ui.danger_zone(url_for('delete_opportunity', id=project.id), 'Delete project', 'Delete this project, its photos and all its applications permanently?', 'Also removes its photos and all applications submitted for it.') }}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}{{ photos_ui.script() }}{% endblock %}

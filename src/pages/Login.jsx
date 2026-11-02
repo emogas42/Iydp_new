@@ -38,7 +38,7 @@ const Login = () => {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-10">
           <p className="text-primary-500 text-sm font-semibold mb-3 uppercase tracking-wider">Hesabım</p>
           <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight mb-3">Daxil ol</h1>
-          <p className="text-slate-500 max-w-md mx-auto">VIP kartınıza baxmaq üçün hesabınıza daxil olun.</p>
+          <p className="text-slate-500 max-w-md mx-auto">Üzvlük kartınıza baxmaq üçün hesabınıza daxil olun.</p>
         </motion.div>
 
         <motion.div
@@ -87,7 +87,7 @@ const Login = () => {
 
           <p className="text-center text-sm text-slate-500 font-medium mt-8">
             Hesabınız yoxdur?{' '}
-            <Link to="/register" className="text-primary-500 font-semibold hover:underline">
+            <Link to="/register" state={location.state} className="text-primary-500 font-semibold hover:underline">
               Qeydiyyatdan keçin
             </Link>
           </p>

@@ -1,0 +1,71 @@
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% block title %}Application{% endblock %}
+
+{% block content %}
+{% set a = application %}
+{% call ui.page_header(a.full_name or a.user.display_name, a.opportunity.title, back=url_for('list_applications', project=a.opportunity_id), back_label='Applications', icon_name='clipboard-list', color='text-ired') %}{% endcall %}
+
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-5 [&>*]:min-w-0">
+    <div class="space-y-5 lg:col-span-3">
+        <section class="card">
+            <div class="card-header"><h2 class="card-title">Motivation</h2></div>
+            <p class="whitespace-pre-line p-4 text-[15px] leading-relaxed text-slate-700 sm:p-5">{{ a.motivation or '—' }}</p>
+        </section>
+
+        <section class="card">
+            <div class="card-header"><h2 class="card-title">Details</h2></div>
+            <dl class="divide-y divide-slate-100 text-sm">
+                {% for label, value in [
+                    ('Date of birth', a.birth_date.strftime('%d.%m.%Y') if a.birth_date else None),
+                    ('Lives in', a.residence),
+                    ('English', a.english_level),
+                    ('Applied', a.applied_at|az_time if a.applied_at else None),
+                    ('Card', a.user.card_label ~ (' · ' ~ a.user.membership_no if a.user.membership_no else '')),
+                ] %}
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">{{ label }}</dt>
+                    <dd class="text-right font-medium">{{ value or '—' }}</dd>
+                </div>
+                {% endfor %}
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Email</dt>
+                    <dd class="min-w-0 truncate text-right">{% if a.email %}<a href="mailto:{{ a.email }}" class="link">{{ a.email }}</a>{% else %}—{% endif %}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Phone</dt>
+                    <dd class="text-right">{% if a.phone %}<a href="tel:{{ a.phone|replace(' ', '') }}" class="link">{{ a.phone }}</a>{% else %}—{% endif %}</dd>
+                </div>
+                {% if a.cv_link %}
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">CV</dt>
+                    <dd class="min-w-0 truncate text-right"><a href="{{ a.cv_link }}" target="_blank" rel="noopener noreferrer nofollow" class="link">Open link</a></dd>
+                </div>
+                {% endif %}
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Account</dt>
+                    <dd class="text-right"><a href="{{ url_for('view_member', id=a.user_id) }}" class="link">Open member</a></dd>
+                </div>
+            </dl>
+        </section>
+    </div>
+
+    <form method="POST" class="card h-fit space-y-5 p-4 sm:p-5 lg:col-span-2" data-busy>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+            <label for="status" class="label">Decision</label>
+            <select id="status" name="status" class="input">
+                <option value="pending" {{ 'selected' if a.status == 'pending' }}>New, not decided</option>
+                <option value="accepted" {{ 'selected' if a.status == 'accepted' }}>Accepted</option>
+                <option value="rejected" {{ 'selected' if a.status == 'rejected' }}>Rejected</option>
+            </select>
+            <p class="hint">The applicant sees this on their account page.</p>
+        </div>
+        <div>
+            <label for="admin_note" class="label">Team note <span class="optional">Only admins see this</span></label>
+            <textarea id="admin_note" name="admin_note" rows="4" class="input resize-y">{{ a.admin_note or '' }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-full">Save</button>
+    </form>
+</div>
+{% endblock %}

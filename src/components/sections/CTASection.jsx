@@ -32,7 +32,7 @@ const CTASection = () => {
           </p>
 
           <div className="flex flex-wrap justify-center gap-4">
-            <Button to="/opportunities" size="lg" arrow>
+            <Button to="/projects" size="lg" arrow>
               Explore programs
             </Button>
             <Button

@@ -55,7 +55,8 @@ const Footer = () => {
             <div className="space-y-2.5">
               {[
                 { label: 'About Us', to: '/#about' },
-                { label: 'Opportunities', to: '/opportunities' },
+                { label: 'Projects', to: '/projects' },
+                { label: 'Events', to: '/events' },
                 { label: 'News', to: '/news' },
                 { label: 'Stories', to: '/stories' },
                 { label: 'FAQ', to: '/faq' },

@@ -1,0 +1,48 @@
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% block title %}Applications{% endblock %}
+
+{% macro status_badge(value) %}
+{% if value == 'accepted' %}<span class="badge badge-green">Accepted</span>
+{% elif value == 'rejected' %}<span class="badge badge-red">Rejected</span>
+{% else %}<span class="badge badge-blue">New</span>{% endif %}
+{% endmacro %}
+
+{% block content %}
+{% call ui.page_header('Applications', project.title if project else items.total ~ ' total', back=url_for('edit_opportunity', id=project.id) if project else None, back_label='Project', icon_name='clipboard-list', color='text-ired') %}
+    {% if items.total %}
+    <a href="{{ url_for('export_applications', project=project_id, status=status or None) }}" class="btn btn-secondary">{{ ui.icon('download') }} CSV</a>
+    {% endif %}
+{% endcall %}
+
+<div class="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0" aria-label="Filter applications">
+    {% for key, label in [('', 'All'), ('pending', 'New'), ('accepted', 'Accepted'), ('rejected', 'Rejected')] %}
+    <a href="{{ url_for('list_applications', project=project_id, status=key or None) }}" {% if status == key %}aria-current="true"{% endif %}
+       class="shrink-0 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors {{ 'bg-iblue-600 text-white' if status == key else 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50' }}">{{ label }}</a>
+    {% endfor %}
+</div>
+
+<div class="card overflow-hidden">
+    {% if items.items %}
+    <ul class="divide-y divide-slate-100">
+        {% for a in items.items %}
+        <li>
+            <a href="{{ url_for('view_application', id=a.id) }}" class="list-row">
+                {{ ui.initials_avatar(a.full_name or a.user.display_name) }}
+                <span class="min-w-0 flex-1">
+                    <span class="block truncate text-sm font-medium text-ink">{{ a.full_name or a.user.display_name }}</span>
+                    <span class="block truncate text-xs text-slate-500">{{ a.opportunity.title }} · {{ a.applied_at|az_time('%d %b %Y') }}</span>
+                </span>
+                {{ status_badge(a.status) }}
+                {{ ui.icon('chevron-right', 'h-3.5 w-3.5 text-slate-300') }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    {{ ui.empty('No applications here', 'Applications sent from project pages appear here.') }}
+    {% endif %}
+</div>
+
+{{ ui.pagination(items, 'list_applications', project=project_id, status=status or None) }}
+{% endblock %}

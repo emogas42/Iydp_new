@@ -1,124 +1,45 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Opportunities  | IYDP </title>
-    {% include 'admin/partials/head_assets.html' %}
-    <style>
-        .btn-action:hover { background: var(--iydp-red); box-shadow: 0 10px 15px rgba(240, 110, 96, 0.2); }
-    </style>
-</head>
-<body class="antialiased p-3 lg:p-6">
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% block title %}Projects{% endblock %}
 
-    <div class="flex flex-col lg:flex-row min-h-screen gap-6">
-        
-       {% include 'admin/partials/sidebar.html' %}
-        <main class="flex-1 lg:pr-4">
-            <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 px-4">
-                <div>
-                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">Opportunity Section </h2>
-                    <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">Total: {{ items.total }}</p>
-                </div>
-                <a href="{{ url_for('add_opportunity') }}" class="btn-action px-8 py-4 text-xs">
-                    <i class="fas fa-plus mr-2"></i> Create Opportunity
-                </a>
-            </header>
+{% block content %}
+{% call ui.page_header('Projects', items.total ~ (' project' if items.total == 1 else ' projects'), icon_name='briefcase', color='text-ired') %}
+    <a href="{{ url_for('add_opportunity') }}" class="btn btn-primary">{{ ui.icon('plus') }} New project</a>
+{% endcall %}
 
-            <div class="rounded-panel overflow-hidden shadow-sm">
-                <div class="px-8 py-6 border-b border-slate-50 bg-slate-50/30 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">All Opportunities</h3>
-                    <form action="{{ url_for('list_opportunities') }}" method="get" class="relative w-full md:w-80">
-                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                        <input type="text" name="search" value="{{ search or '' }}" class="search-input" placeholder="Search opportunities...">
-                    </form>
-                </div>
+<div class="mb-4">{{ ui.search(url_for('list_opportunities'), search, 'Search projects') }}</div>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">
-                                <th class="px-8 py-5">Opportunity Info</th>
-                                <th class="px-8 py-5 text-center">Status</th>
-                                <th class="px-8 py-5 text-center">Engagement</th>
-                                <th class="px-8 py-5 text-right">Operations</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-50">
-                            {% for item in items.items %}
-                            <tr class="hover:bg-slate-50/80 transition-all group">
-                             <td class="px-8 py-6 max-w-[300px]"> <div class="flex items-center gap-4">
-        <div class="w-11 h-11 shrink-0 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center border border-red-100 group-hover:bg-white group-hover:shadow-sm transition-all">
-            <i class="fas fa-briefcase"></i>
-        </div>
-        <div class="min-w-0 flex-1"> <div class="text-sm font-black text-slate-900 mb-0.5" 
-                 style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"
-                 title="{{ item.title }}"> {{ item.title }}
-            </div>
-            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                {{ item.created_at|az_time('%d %b, %Y') }}
-            </div>
-        </div>
-    </div>
-</td>
-                                <td class="px-8 py-6 text-center">
-                                    {% if item.is_active %}
-                                    <span class="status-pill bg-green-50 text-green-500 border-green-100">Active</span>
-                                    {% else %}
-                                    <span class="status-pill bg-yellow-50 text-yellow-500 border-yellow-100">Closed</span>
-                                    {% endif %}
-                                </td>
-                                <td class="px-8 py-6 text-center">
-                                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00aef6]/10 text-[#00aef6]">
-                                        <i class="fas fa-eye text-[10px]"></i>
-                                        <span class="text-xs font-black">{{ item.view_count }}</span>
-                                    </div>
-                                </td>
-                                <td class="px-8 py-6 text-right">
-                                    <div class="flex justify-end gap-2">
-                                        <a href="{{ url_for('edit_opportunity', id=item.id) }}" class="w-9 h-9 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-[#00aef6] hover:text-white transition-all shadow-sm">
-                                            <i class="fas fa-pen text-[10px]"></i>
-                                        </a>
-                                        <form action="{{ url_for('delete_opportunity', id=item.id) }}" method="POST" class="inline" onsubmit="return confirm('Delete permanently?');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="w-9 h-9 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm">
-                                                <i class="fas fa-trash-alt text-[10px]"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+<div class="card overflow-hidden">
+    {% if items.items %}
+    <ul class="divide-y divide-slate-100">
+        {% for o in items.items %}
+        <li>
+            <a href="{{ url_for('edit_opportunity', id=o.id) }}" class="list-row">
+                {% if o.poster_path %}
+                <img src="{{ o.poster_path }}" alt="" class="h-16 w-12 shrink-0 rounded object-cover">
+                {% else %}
+                <span class="flex h-16 w-12 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-400">{{ ui.icon('image') }}</span>
+                {% endif %}
+                <span class="min-w-0 flex-1">
+                    <span class="line-clamp-2 text-sm font-medium text-ink">{{ o.title }}</span>
+                    <span class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        {% if o.location %}<span class="inline-flex items-center gap-1">{{ ui.icon('map-pin', 'h-3.5 w-3.5 text-slate-400') }}{{ o.location }}</span>{% endif %}
+                        <span class="inline-flex items-center gap-1">{{ ui.icon('clock', 'h-3.5 w-3.5 text-slate-400') }}{{ ('Deadline ' ~ o.deadline|datetimeformat('%d %b %Y')) if o.deadline else 'No deadline' }}</span>
+                        <span class="inline-flex items-center gap-1">{{ ui.icon('clipboard-list', 'h-3.5 w-3.5 text-slate-400') }}{{ o.applications|length }} applied</span>
+                    </span>
+                </span>
+                {% if not o.is_active %}<span class="badge badge-slate">Hidden</span>
+                {% elif o.phase == 'finished' %}<span class="badge badge-purple">Finished</span>
+                {% else %}<span class="badge badge-green">Present</span>{% endif %}
+                {{ ui.icon('chevron-right', 'h-3.5 w-3.5 text-slate-300') }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    {{ ui.empty('No projects match your search' if search else 'No projects yet', action=None if search else url_for('add_opportunity'), action_label='New project') }}
+    {% endif %}
+</div>
 
-                <div class="px-8 py-6 border-t border-slate-50 flex flex-col md:flex-row justify-between items-center gap-6 bg-slate-50/20">
-                    <div class="flex flex-col gap-1 text-left">
-                        <p class="text-[10px] font-bold text-slate-500 uppercase">Showing <span class="text-slate-900">{{ items.items|length }}</span> of {{ items.total }} records</p>
-                    </div>
-                    {% if items.pages > 1 %}
-                    <nav class="flex items-center gap-2">
-                        {% if items.has_prev %}
-                        <a href="{{ url_for(request.endpoint, page=items.prev_num, search=search) }}" class="page-link-custom text-slate-400 hover:border-[#6f3d90] bg-white shadow-sm"><i class="fas fa-chevron-left text-[10px]"></i></a>
-                        {% endif %}
-                        <div class="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-full">
-                            {% for p in items.iter_pages(left_edge=1, left_current=1, right_current=2, right_edge=1) %}
-                                {% if p %}
-                                    <a href="{{ url_for(request.endpoint, page=p, search=search) }}" class="w-8 h-8 flex items-center justify-center rounded-full text-[11px] font-black transition-all {{ 'bg-[#6f3d90] text-white shadow-lg shadow-[#6f3d90]/20' if p == items.page else 'text-slate-500 hover:text-[#6f3d90]' }}">{{ p }}</a>
-                                {% else %}
-                                    <span class="text-slate-300 px-1 text-xs">...</span>
-                                {% endif %}
-                            {% endfor %}
-                        </div>
-                        {% if items.has_next %}
-                        <a href="{{ url_for(request.endpoint, page=items.next_num, search=search) }}" class="page-link-custom text-slate-400 hover:border-[#6f3d90] bg-white shadow-sm"><i class="fas fa-chevron-right text-[10px]"></i></a>
-                        {% endif %}
-                    </nav>
-                    {% endif %}
-                </div>
-            </div>
-        </main>
-    </div>
-</body>
-</html>
+{{ ui.pagination(items, 'list_opportunities', search=search) }}
+{% endblock %}

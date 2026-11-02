@@ -1,0 +1,137 @@
+{#- Small building blocks shared by admin pages. Import with:
+    {% import 'admin/_ui.html' as ui with context %} -#}
+{% from 'admin/_icons.html' import icon as _icon %}
+
+{% macro icon(name, cls='h-4 w-4') %}{{ _icon(name, cls) }}{% endmacro %}
+
+
+{% macro page_header(title, subtitle=None, back=None, back_label='Back', icon_name=None, color='text-iblue') %}
+<div class="mb-6 lg:mb-8">
+    {% if back %}
+    <a href="{{ back }}" class="mb-3 inline-flex items-center gap-1.5 py-1 text-sm font-medium text-slate-500 hover:text-ink">
+        {{ icon('arrow-left', 'h-4 w-4') }} {{ back_label }}
+    </a>
+    {% endif %}
+    <div class="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div class="min-w-0">
+            <h1 class="flex items-center gap-2.5 text-xl font-bold tracking-tight text-ink sm:text-2xl">{% if icon_name %}{{ icon(icon_name, 'h-6 w-6 ' ~ color) }}{% endif %}{{ title }}</h1>
+            {% if subtitle %}<p class="mt-1 text-sm text-slate-500">{{ subtitle }}</p>{% endif %}
+        </div>
+        {% if caller is defined %}
+        <div class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">{{ caller() }}</div>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}
+
+
+{#- A numbered part of a form, with a one-line explanation of what it is for. -#}
+{% macro section(step, title, description=None, total=None) %}
+<section class="card">
+    <div class="border-b border-slate-200 px-4 py-3.5 sm:px-6">
+        <p class="text-xs font-semibold uppercase tracking-wide text-ipurple">Step {{ step }}{% if total %} of {{ total }}{% endif %}</p>
+        <h2 class="mt-0.5 text-[15px] font-semibold text-ink">{{ title }}</h2>
+        {% if description %}<p class="mt-0.5 text-[13px] leading-snug text-slate-500">{{ description }}</p>{% endif %}
+    </div>
+    <div class="space-y-5 p-4 sm:p-6">{{ caller() }}</div>
+</section>
+{% endmacro %}
+
+
+{% macro search(action, value='', placeholder='Search', hidden={}) %}
+<form action="{{ action }}" method="get" class="input-icon" role="search">
+    {% for k, v in hidden.items() if v %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    {{ icon('search') }}
+    <input type="search" name="search" value="{{ value or '' }}" placeholder="{{ placeholder }}" aria-label="{{ placeholder }}"
+           class="input {{ 'pr-10' if value }} [&::-webkit-search-cancel-button]:hidden">
+    {% if value %}
+    <a href="{{ action }}{% if hidden %}?{% for k, v in hidden.items() if v %}{{ k }}={{ v|urlencode }}{% if not loop.last %}&{% endif %}{% endfor %}{% endif %}"
+       class="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-ink" aria-label="Clear search">
+        {{ icon('x') }}
+    </a>
+    {% endif %}
+</form>
+{% endmacro %}
+
+
+{% macro pagination(pager, endpoint) %}
+{% if pager.pages > 1 %}
+{% set args = kwargs %}
+<nav class="mt-4 flex items-center justify-between gap-3" aria-label="Pagination">
+    {% if pager.has_prev %}
+    <a href="{{ url_for(endpoint, page=pager.prev_num, **args) }}" class="btn btn-secondary">{{ icon('chevron-left') }} Previous</a>
+    {% else %}<span></span>{% endif %}
+    <span class="text-sm text-slate-500">Page {{ pager.page }} of {{ pager.pages }}</span>
+    {% if pager.has_next %}
+    <a href="{{ url_for(endpoint, page=pager.next_num, **args) }}" class="btn btn-secondary">Next {{ icon('chevron-right') }}</a>
+    {% else %}<span></span>{% endif %}
+</nav>
+{% endif %}
+{% endmacro %}
+
+
+{% macro empty(title, text=None, action=None, action_label=None) %}
+<div class="px-6 py-12 text-center">
+    <p class="font-semibold text-ink">{{ title }}</p>
+    {% if text %}<p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">{{ text }}</p>{% endif %}
+    {% if action %}<a href="{{ action }}" class="btn btn-primary mt-5">{{ icon('plus') }} {{ action_label }}</a>{% endif %}
+</div>
+{% endmacro %}
+
+
+{% macro status(published, on='Published', off='Draft') %}
+{% if published %}<span class="badge badge-green">{{ on }}</span>{% else %}<span class="badge badge-slate">{{ off }}</span>{% endif %}
+{% endmacro %}
+
+
+{% macro toggle(name, label, hint=None, checked=True) %}
+<label class="flex cursor-pointer items-start justify-between gap-4">
+    <span>
+        <span class="block text-sm font-semibold text-slate-800">{{ label }}</span>
+        {% if hint %}<span class="mt-0.5 block text-[13px] text-slate-500">{{ hint }}</span>{% endif %}
+    </span>
+    <span class="relative mt-0.5 inline-flex shrink-0">
+        <input type="checkbox" name="{{ name }}" class="peer sr-only" {{ 'checked' if checked }}>
+        <span class="h-7 w-12 rounded-full bg-slate-300 transition-colors peer-checked:bg-igreen-dark peer-focus-visible:ring-2 peer-focus-visible:ring-iblue peer-focus-visible:ring-offset-2"></span>
+        <span class="absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></span>
+    </span>
+</label>
+{% endmacro %}
+
+
+{#- Sticky action bar at the bottom of long forms (sits above the phone tab bar). -#}
+{% macro form_actions(submit_label, cancel_url, busy_label='Saving…') %}
+<div class="sticky bottom-[calc(60px+env(safe-area-inset-bottom))] z-20 -mx-4 mt-6 border-t border-slate-200 bg-white px-4 py-3 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:mt-8 lg:border-0 lg:bg-transparent lg:p-0">
+    <div class="flex items-center justify-end gap-2">
+        <a href="{{ cancel_url }}" class="btn btn-ghost">Cancel</a>
+        <button type="submit" class="btn btn-primary flex-1 sm:min-w-[140px] sm:flex-none" data-busy-label="{{ busy_label }}">{{ submit_label }}</button>
+    </div>
+</div>
+{% endmacro %}
+
+
+{% macro danger_zone(action, label, confirm_text, description) %}
+<section class="card mt-8">
+    <div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div>
+            <p class="text-sm font-semibold text-ink">{{ label }}</p>
+            <p class="mt-0.5 text-[13px] text-slate-500">{{ description }}</p>
+        </div>
+        <form action="{{ action }}" method="POST" onsubmit="return confirm({{ confirm_text|tojson|forceescape }});">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger w-full sm:w-auto">{{ icon('trash-2') }} {{ label }}</button>
+        </form>
+    </div>
+</section>
+{% endmacro %}
+
+
+{% macro initials_avatar(name, src=None, size='h-9 w-9 text-xs') %}
+{% if src %}
+<img src="{{ src }}" alt="" class="{{ size }} shrink-0 rounded-full object-cover">
+{% else %}
+<span class="{{ size }} flex shrink-0 items-center justify-center rounded-full bg-slate-100 font-semibold uppercase text-slate-600" aria-hidden="true">
+    {%- for w in (name or '?').split()[:2] %}{{ w[:1] }}{% endfor -%}
+</span>
+{% endif %}
+{% endmacro %}

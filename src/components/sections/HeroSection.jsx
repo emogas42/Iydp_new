@@ -55,7 +55,7 @@ const HeroSection = () => {
           </p>
 
           <div className="flex flex-wrap justify-center gap-4 mb-6">
-            <Button to="/opportunities" className="font-bold px-7 py-3 text-sm sm:text-base shadow-lg shadow-primary-900/25" arrow>
+            <Button to="/projects" className="font-bold px-7 py-3 text-sm sm:text-base shadow-lg shadow-primary-900/25" arrow>
               Explore Programs
             </Button>
             <Button to="/erasmus" variant="outline" className="font-bold px-7 py-3 text-sm sm:text-base border-white/80 text-white hover:bg-white hover:text-slate-900" arrow>

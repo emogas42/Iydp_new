@@ -1,104 +1,47 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Events | IYDP Admin</title>
-    {% include 'admin/partials/head_assets.html' %}
-</head>
-<body class="antialiased p-3 lg:p-6">
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% block title %}Events{% endblock %}
 
-    <div class="flex flex-col lg:flex-row min-h-screen gap-6">
-        {% include 'admin/partials/sidebar.html' %}
-        <main class="flex-1 lg:pr-4">
-            <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 px-4">
-                <div>
-                    <h2 class="display-font text-3xl lg:text-4xl font-black text-slate-900 uppercase">Events</h2>
-                    <p class="text-slate-500 font-bold mt-1 uppercase text-[10px] tracking-widest">Found {{ items.total }} events in total</p>
-                </div>
-                <a href="{{ url_for('add_event') }}" class="btn-action px-8 py-4 text-xs">
-                    <i class="fas fa-plus mr-2"></i> New Event
-                </a>
-            </header>
+{% block content %}
+{% call ui.page_header('Events', 'Shown on the website; registrations and QR check-ins per event', icon_name='calendar-days', color='text-ired') %}
+    <a href="{{ url_for('scanner') }}" class="btn btn-secondary">{{ ui.icon('qr-code', 'h-3.5 w-3.5') }} Scanner</a>
+    <a href="{{ url_for('add_event') }}" class="btn btn-primary">{{ ui.icon('plus', 'h-3.5 w-3.5') }} New event</a>
+{% endcall %}
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                <div class="px-4 mb-6 space-y-2">
-                    {% for category, message in messages %}
-                    <div class="rounded-2xl px-6 py-4 text-sm font-bold {{ 'bg-green-50 text-green-600 border border-green-100' if category == 'success' else 'bg-red-50 text-red-600 border border-red-100' if category in ['danger', 'error'] else 'bg-blue-50 text-blue-600 border border-blue-100' }}">
-                        {{ message }}
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-            {% endwith %}
+<div class="mb-4">{{ ui.search(url_for('list_events'), search, 'Search events') }}</div>
 
-            <div class="rounded-panel overflow-hidden shadow-sm">
-                <div class="px-8 py-6 border-b border-slate-50 bg-slate-50/30 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest">All Events</h3>
-                    <form action="{{ url_for('list_events') }}" method="get" class="relative w-full md:w-80">
-                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                        <input type="text" name="search" value="{{ search or '' }}" class="search-input" placeholder="Search events...">
-                    </form>
-                </div>
+<div class="card overflow-hidden">
+    {% if items.items %}
+    <ul class="divide-y divide-slate-100">
+        {% for e in items.items %}
+        <li>
+            <a href="{{ url_for('event_attendance', id=e.id) }}" class="list-row">
+                <span class="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md border border-slate-200 leading-none">
+                    {% if e.starts_at %}
+                    <span class="text-[10px] font-bold uppercase {{ 'text-ired-dark' if e.is_active else 'text-slate-400' }}">{{ e.starts_at|datetimeformat('%b') }}</span>
+                    <span class="mt-0.5 text-base font-bold {{ 'text-ink' if e.is_active else 'text-slate-500' }}">{{ e.starts_at.day }}</span>
+                    {% else %}
+                    {{ ui.icon('calendar', 'h-4 w-4 text-slate-400') }}
+                    {% endif %}
+                </span>
+                <span class="min-w-0 flex-1">
+                    <span class="line-clamp-2 text-sm font-medium text-slate-900">{{ e.name }}</span>
+                    <span class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        {% if e.starts_at %}<span>{{ e.starts_at|datetimeformat('%H:%M') }}</span>{% endif %}
+                        {% if e.location %}<span class="truncate">{{ ui.icon('map-pin', 'h-4 w-4 mr-1 text-slate-400') }}{{ e.location }}</span>{% endif %}
+                        <span>{{ ui.icon('user-check', 'h-3.5 w-3.5 mr-1 text-slate-400') }}{{ e.registrations|length }} registered · {{ e.attendances|length }} in</span>
+                    </span>
+                </span>
+                {{ ui.status(e.is_public, on='On website', off='Hidden') }}
+                {{ ui.icon('chevron-right', 'h-3.5 w-3.5 text-slate-300') }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    {{ ui.empty('No events match your search' if search else 'No events yet', None if search else 'Create an event to open registration and scan member cards.', action=None if search else url_for('add_event'), action_label='New event') }}
+    {% endif %}
+</div>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">
-                                <th class="px-8 py-5">Event</th>
-                                <th class="px-8 py-5">Date / Location</th>
-                                <th class="px-8 py-5 text-center">Status</th>
-                                <th class="px-8 py-5 text-right">Operations</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-50">
-                            {% for item in items.items %}
-                            <tr class="hover:bg-slate-50/80 transition-all group">
-                                <td class="px-8 py-6">
-                                    <div class="w-11 h-11 shrink-0 rounded-2xl bg-green-50 text-green-500 flex items-center justify-center border border-green-100 inline-flex mr-4 align-middle">
-                                        <i class="fas fa-calendar-days"></i>
-                                    </div>
-                                    <span class="text-sm font-black text-slate-900 align-middle">{{ item.name }}</span>
-                                </td>
-                                <td class="px-8 py-6 text-xs font-bold text-slate-500">
-                                    {{ item.starts_at|az_time('%d %b, %Y %H:%M') if item.starts_at else 'No date set' }}<br>
-                                    <span class="text-slate-400">{{ item.location or '' }}</span>
-                                </td>
-                                <td class="px-8 py-6 text-center">
-                                    {% if item.is_active %}
-                                    <span class="status-pill bg-green-50 text-green-500 border-green-100">Active</span>
-                                    {% else %}
-                                    <span class="status-pill bg-slate-100 text-slate-400 border-slate-200">Inactive</span>
-                                    {% endif %}
-                                </td>
-                                <td class="px-8 py-6 text-right">
-                                    <div class="flex justify-end gap-2">
-                                        <a href="{{ url_for('event_attendance', id=item.id) }}" class="w-9 h-9 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-[#6f3d90] hover:text-white transition-all shadow-sm" title="Attendance">
-                                            <i class="fas fa-user-check text-[10px]"></i>
-                                        </a>
-                                        <a href="{{ url_for('edit_event', id=item.id) }}" class="w-9 h-9 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-[#00aef6] hover:text-white transition-all shadow-sm">
-                                            <i class="fas fa-pen text-[10px]"></i>
-                                        </a>
-                                        <form action="{{ url_for('delete_event', id=item.id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this event?');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="w-9 h-9 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm">
-                                                <i class="fas fa-trash-alt text-[10px]"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="4" class="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No events found</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </main>
-    </div>
-</body>
-</html>
+{{ ui.pagination(items, 'list_events', search=search) }}
+{% endblock %}

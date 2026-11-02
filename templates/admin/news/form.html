@@ -1,0 +1,64 @@
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% set editing = news is defined and news %}
+{% block title %}{{ 'Edit news' if editing else 'New news' }}{% endblock %}
+
+{% block content %}
+{% call ui.page_header('Edit news' if editing else 'New news', 'Shown on the News page of the website', back=url_for('list_news'), back_label='News', icon_name='newspaper', color='text-igreen') %}
+    {% if editing and news.is_published %}
+    <a href="/news/{{ news.id }}" target="_blank" rel="noopener" class="btn btn-secondary">{{ ui.icon('external-link', 'h-3.5 w-3.5') }} View on site</a>
+    {% endif %}
+{% endcall %}
+
+<form method="POST" action="{{ url_for('edit_news', id=news.id) if editing else url_for('add_news') }}" class="space-y-5" data-busy>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {% call ui.section(1, 'Headline and cover', 'The headline appears on the news card and at the top of the article.') %}
+        <div>
+            <label for="title" class="label">Headline <span class="required">*</span></label>
+            <input type="text" id="title" name="title" required maxlength="200" class="input" value="{{ news.title if editing else '' }}" placeholder="e.g. IYDP joins the CELT Education Fair">
+        </div>
+        <div>
+            <label for="image_url" class="label">Cover image link <span class="optional">Optional</span></label>
+            <div class="input-icon">
+                {{ ui.icon('link', 'h-4 w-4') }}
+                <input type="url" id="image_url" name="image_url" class="input" placeholder="https://example.com/photo.jpg" inputmode="url" value="{{ (news.image_url or '') if editing else '' }}">
+            </div>
+            <p class="hint">Paste the web address of an image. Leave empty to show no cover.</p>
+            <img id="cover-preview" src="{{ news.image_url if editing and news.image_url else '' }}" alt="" class="mt-3 aspect-[16/9] w-full max-w-sm rounded-xl border border-slate-200 object-cover {{ '' if editing and news.image_url else 'hidden' }}">
+        </div>
+    {% endcall %}
+
+    {% call ui.section(2, 'Article text', 'Write the full news. Leave an empty line between paragraphs.') %}
+        <div>
+            <label for="content" class="label">Text <span class="required">*</span></label>
+            <textarea id="content" name="content" required rows="12" class="input min-h-[240px] resize-y">{{ news.content if editing else '' }}</textarea>
+        </div>
+    {% endcall %}
+
+    {% call ui.section(3, 'Visibility', None) %}
+        {{ ui.toggle('is_published', 'Show on website', 'Turn off to keep it as a draft that only admins can see.', checked=(news.is_published if editing else True)) }}
+    {% endcall %}
+
+    {{ ui.form_actions('Save changes' if editing else 'Publish news', url_for('list_news')) }}
+</form>
+
+{% if editing %}
+{{ ui.danger_zone(url_for('delete_news', id=news.id), 'Delete news', 'Delete this news permanently?', 'Removes the article from the website permanently.') }}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    var input = document.getElementById('image_url');
+    var img = document.getElementById('cover-preview');
+    img.addEventListener('error', function () { img.classList.add('hidden'); });
+    img.addEventListener('load', function () { img.classList.remove('hidden'); });
+    input.addEventListener('change', function () {
+        if (!input.value) { img.classList.add('hidden'); return; }
+        img.src = input.value;
+    });
+})();
+</script>
+{% endblock %}

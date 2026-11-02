@@ -1,0 +1,119 @@
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% import 'admin/partials/photo_manager.html' as photos_ui with context %}
+{% set editing = story is not none %}
+{% set v = form if form else {} %}
+{% block title %}{{ 'Edit story' if editing else 'New story' }}{% endblock %}
+
+{% block head %}{{ photos_ui.head() }}{% endblock %}
+
+{% block content %}
+{% call ui.page_header('Edit story' if editing else 'New story', 'A participant’s experience, shown on the Stories page', back=url_for('list_stories'), back_label='Stories', icon_name='book-open', color='text-ipurple') %}
+    {% if editing and story.is_published %}
+    <a href="/stories/{{ story.slug }}" target="_blank" rel="noopener" class="btn btn-secondary">{{ ui.icon('external-link', 'h-3.5 w-3.5') }} View on site</a>
+    {% endif %}
+{% endcall %}
+
+<form id="story-form" method="POST" enctype="multipart/form-data" data-busy
+      action="{{ url_for('edit_story', id=story.id) if editing else url_for('add_story') }}" class="space-y-5">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {% call ui.section(1, 'Story', 'A short, catchy title and the programme they took part in.') %}
+        <div class="grid gap-5 sm:grid-cols-3">
+            <div class="sm:col-span-2">
+                <label for="title" class="label">Title <span class="required">*</span></label>
+                <input type="text" name="title" id="title" required maxlength="200" class="input"
+                       value="{{ v.get('title', story.title if editing else '') }}"
+                       placeholder="e.g. Ten days in Lisbon that changed how I see Europe">
+            </div>
+            <div>
+                <label for="program" class="label">Programme <span class="optional">Optional</span></label>
+                <input type="text" name="program" id="program" list="program-options" maxlength="60" class="input"
+                       value="{{ v.get('program', (story.program or '') if editing else '') }}" placeholder="Choose or type">
+                <datalist id="program-options">{% for p in programs %}<option value="{{ p }}">{% endfor %}</datalist>
+            </div>
+        </div>
+    {% endcall %}
+
+    {% call ui.section(2, 'Participant', 'Who is telling the story. Their photo and name appear on the card.') %}
+        <div class="flex flex-col gap-5 sm:flex-row sm:items-start">
+            <div class="flex items-center gap-4 sm:flex-col sm:items-center sm:gap-2">
+                <label for="avatar" class="group relative block h-24 w-24 shrink-0 cursor-pointer overflow-hidden rounded-full border-2 border-dashed border-slate-300 bg-slate-50 hover:border-iblue" title="Upload profile photo">
+                    <img id="avatar-preview" src="{{ story.avatar_path if editing and story.avatar_path else '' }}" alt=""
+                         class="h-full w-full object-cover {{ '' if editing and story.avatar_path else 'hidden' }}">
+                    <span id="avatar-empty" class="absolute inset-0 flex flex-col items-center justify-center text-xs font-medium text-slate-500 {{ 'hidden' if editing and story.avatar_path else '' }}">
+                        {{ ui.icon('camera', 'h-5 w-5 mb-1') }} Photo
+                    </span>
+                </label>
+                <input type="file" name="avatar" id="avatar" accept="image/jpeg,image/png,image/webp" class="sr-only">
+                <div class="text-sm sm:text-center">
+                    <label for="avatar" class="link cursor-pointer">{{ 'Change photo' if editing and story.avatar_path else 'Upload photo' }}</label>
+                    {% if editing and story.avatar_path %}
+                    <label class="mt-1 flex cursor-pointer items-center gap-1.5 text-[13px] text-slate-500 sm:justify-center">
+                        <input type="checkbox" name="remove_avatar" value="1" id="remove-avatar" class="rounded border-slate-300"> Remove
+                    </label>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="grid flex-1 gap-5">
+                <div>
+                    <label for="author_name" class="label">Full name <span class="required">*</span></label>
+                    <input type="text" name="author_name" id="author_name" required maxlength="120" class="input" autocomplete="off"
+                           value="{{ v.get('author_name', story.author_name if editing else '') }}" placeholder="e.g. Aysel Mammadova">
+                </div>
+                <div>
+                    <label for="author_info" class="label">Short info <span class="optional">Optional</span></label>
+                    <input type="text" name="author_info" id="author_info" maxlength="160" class="input"
+                           value="{{ v.get('author_info', (story.author_info or '') if editing else '') }}" placeholder="e.g. Youth Exchange · Lisbon · 2025">
+                    <p class="hint">One line under the name: project, city, year.</p>
+                </div>
+            </div>
+        </div>
+    {% endcall %}
+
+    {% call ui.section(3, 'Their experience', 'In the participant’s own words. Leave an empty line between paragraphs; the first one is shown larger as the introduction.') %}
+        <div>
+            <label for="content" class="label">Story text <span class="required">*</span></label>
+            <textarea name="content" id="content" rows="14" required class="input min-h-[280px] resize-y">{{ v.get('content', story.content if editing else '') }}</textarea>
+        </div>
+    {% endcall %}
+
+    {% call ui.section(4, 'Project photos', 'Shown as a gallery at the end of the story. The first photo is also the cover of the card.') %}
+
+        {{ photos_ui.fields(story.photos if editing else []) }}
+    {% endcall %}
+
+    {% set published = (v.get('is_published') if v else (story.is_published if editing else True)) %}
+    {% call ui.section(5, 'Visibility', None) %}
+        {{ ui.toggle('is_published', 'Show on website', 'Turn off to keep it as a draft that only admins can see.', checked=published) }}
+    {% endcall %}
+
+    {{ ui.form_actions('Save changes' if editing else 'Create story', url_for('list_stories'), busy_label='Uploading…') }}
+</form>
+
+{% if editing %}
+{{ ui.danger_zone(url_for('delete_story', id=story.id), 'Delete story', 'Delete this story and all its photos permanently?', 'Removes the story and its photos from the website permanently.') }}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    var avatarInput = document.getElementById('avatar');
+    var avatarPreview = document.getElementById('avatar-preview');
+    var avatarEmpty = document.getElementById('avatar-empty');
+    var removeAvatar = document.getElementById('remove-avatar');
+    avatarInput.addEventListener('change', function () {
+        var file = avatarInput.files[0];
+        if (!file) return;
+        avatarPreview.src = URL.createObjectURL(file);
+        avatarPreview.classList.remove('hidden');
+        avatarEmpty.classList.add('hidden');
+        if (removeAvatar) removeAvatar.checked = false;
+    });
+
+})();
+</script>
+{{ photos_ui.script() }}
+{% endblock %}

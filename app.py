@@ -1,9 +1,10 @@
+import csv
 import html
 import io
 import os
 import re
 import secrets
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from functools import wraps
 
 import logging
@@ -22,16 +23,20 @@ from flask_wtf import CSRFProtect
 from flask_wtf.csrf import generate_csrf
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 import qrcode
 import qrcode.image.svg
 
 from models import (
-    db, User, ContactMessage, Opportunity, OpportunityTag, Application,
-    News, BlogPost, Payment, Event, Attendance,
+    db, User, ContactMessage, Opportunity, OpportunityTag, OpportunityPhoto, Application,
+    News, Story, StoryPhoto, Payment, Event, EventRegistration, Attendance,
+    az_now_naive,
 )
 from services import vip as vip_service
 from services import checkin as checkin_service
+from services import uploads as upload_service
 
 load_dotenv()
 
@@ -52,6 +57,11 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'DATABASE_URL', 'sqlite:///iydp.db'
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Pick up template edits without restarting the server (cheap: one stat per render).
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+# Story albums are uploaded in one request; individual images are
+# downscaled on save, so this only bounds the raw upload.
+app.config['MAX_CONTENT_LENGTH'] = 80 * 1024 * 1024
 
 # Session cookie hardening. SESSION_COOKIE_SECURE defaults to on (cookies only
 # sent over HTTPS); set SESSION_COOKIE_SECURE=0 in .env for local HTTP dev.
@@ -61,6 +71,17 @@ app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', '1
 
 db.init_app(app)
 migrate = Migrate(app, db)
+
+
+@app.after_request
+def set_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'DENY')  # blocks clickjacking of the admin panel
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    # Member data must not be left in a shared computer's browser cache.
+    if request.path.startswith(('/admin', '/api/account', '/api/auth')):
+        response.headers['Cache-Control'] = 'no-store'
+    return response
 
 csrf = CSRFProtect(app)
 limiter = Limiter(get_remote_address, app=app, default_limits=[])
@@ -132,37 +153,55 @@ def format_az_time(dt, format='%d %B, %Y %H:%M'):
     hour = az_dt.hour
     minute = az_dt.minute
 
-    return f"{day} {month}, {year} {hour:02d}:{minute:02d}"
+    if '%H' not in format:
+        return f"{day} {month} {year}"
+    return f"{day} {month} {year}, {hour:02d}:{minute:02d}"
 
 
 @app.context_processor
 def inject_now():
-    return {'now': datetime.now()}
+    return {'now': datetime.now(), 'az_now': az_datetime()}
 
 
 @app.context_processor
 def inject_admin_counters():
     if current_user.is_authenticated and current_user.is_admin:
-        return {'pending_vip_count': Payment.query.filter_by(status='pending').count()}
+        return {
+            'pending_vip_count': Payment.query.filter_by(status='pending').count(),
+            # Views may still pass their own value; this is the fallback for the nav badge.
+            'unread_count': ContactMessage.query.filter_by(is_read=False).count(),
+            'pending_applications_count': Application.query.filter_by(status='pending').count(),
+        }
     return {}
 
 
 @login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
+def load_user(session_id):
+    user_id, _, version = session_id.partition('.')
+    user = db.session.get(User, int(user_id))
+    if user and str(user.session_version) == version:
+        return user
+    return None
 
 
 with app.app_context():
     db.create_all()
     try:
-        if not User.query.filter_by(username='admin').first():
-            admin = User(
-                username='admin',
-                password=generate_password_hash('admin123'),
-                is_admin=True
-            )
-            db.session.add(admin)
-            db.session.commit()
+        # The first admin comes from the environment: no default password in the code.
+        if not User.query.filter_by(is_admin=True).first():
+            admin_password = os.environ.get('ADMIN_PASSWORD')
+            if admin_password:
+                admin = User(
+                    username=os.environ.get('ADMIN_USERNAME', 'admin'),
+                    password=generate_password_hash(admin_password),
+                    is_admin=True,
+                )
+                db.session.add(admin)
+                db.session.flush()
+                admin.ensure_card()
+                db.session.commit()
+            else:
+                warnings.warn('No admin account exists. Set ADMIN_PASSWORD and restart to create one.', RuntimeWarning)
     except Exception:
         # Schema not migrated yet (e.g. `flask db migrate` inspecting models
         # before `flask db upgrade` has run). Safe to skip on this pass.
@@ -204,11 +243,12 @@ def home():
     return serve_spa()
 
 @app.route('/contact', methods=['GET', 'POST'])
+@limiter.limit('5 per minute', methods=['POST'])
 def contact():
     if request.method == 'POST':
-        raw_name = request.form.get('name', '')
-        raw_email = request.form.get('email', '')
-        raw_message = request.form.get('message', '')
+        raw_name = request.form.get('name', '')[:150]
+        raw_email = request.form.get('email', '')[:150]
+        raw_message = request.form.get('message', '')[:5000]
 
         if not all([raw_name, raw_email, raw_message]):
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -258,8 +298,10 @@ def user_to_dict(u):
         'email': u.email,
         'phone': u.phone,
         'is_admin': u.is_admin,
+        'must_change_password': u.must_change_password,
         'is_vip': u.is_vip,
         'vip_status': u.vip_status,
+        'card_type': u.card_type,
         'membership_no': u.membership_no,
         'vip_requested_at': u.vip_requested_at.isoformat() if u.vip_requested_at else None,
         'vip_activated_at': u.vip_activated_at.isoformat() if u.vip_activated_at else None,
@@ -286,12 +328,14 @@ def api_register():
     confirm_password = data.get('confirm_password') or ''
 
     errors = []
-    if not full_name:
+    if not full_name or len(full_name) > 150:
         errors.append('Ad və soyadınızı daxil edin.')
-    if not EMAIL_RE.match(email):
+    if not EMAIL_RE.match(email) or len(email) > 150:
         errors.append('Düzgün email ünvanı daxil edin.')
-    if len(password) < 6:
-        errors.append('Şifrə ən azı 6 simvoldan ibarət olmalıdır.')
+    if len(phone) > 30:
+        errors.append('Telefon nömrəsi çox uzundur.')
+    if len(password) < 8:
+        errors.append('Şifrə ən azı 8 simvoldan ibarət olmalıdır.')
     if password != confirm_password:
         errors.append('Şifrələr uyğun gəlmir.')
     if email and User.query.filter_by(email=email).first():
@@ -313,6 +357,8 @@ def api_register():
         is_admin=False,
     )
     db.session.add(member)
+    db.session.flush()
+    member.ensure_card()
     db.session.commit()
 
     login_user(member)
@@ -373,12 +419,52 @@ def api_account():
             'event_name': a.event.name,
             'checked_in_at': a.checked_in_at.isoformat() if a.checked_in_at else None,
         } for a in attendances],
+        'applications': [{
+            'id': a.id,
+            'project_id': a.opportunity_id,
+            'project_title': a.opportunity.title,
+            'status': a.status,
+            'applied_at': a.applied_at.isoformat() if a.applied_at else None,
+        } for a in sorted(current_user.applications, key=lambda a: a.id, reverse=True)],
+        'event_registrations': [{
+            'id': r.id,
+            'event_id': r.event_id,
+            'event_name': r.event.name,
+            'starts_at': r.event.starts_at.isoformat() if r.event.starts_at else None,
+        } for r in sorted(current_user.event_registrations, key=lambda r: r.id, reverse=True) if r.event.is_public],
     })
+
+
+@app.route('/api/account/password', methods=['POST'])
+@login_required
+@limiter.limit('10 per minute')
+def api_change_password():
+    data = request.get_json(silent=True) or {}
+    current_password = data.get('current_password') or ''
+    new_password = data.get('new_password') or ''
+
+    if not check_password_hash(current_user.password, current_password):
+        return jsonify({'error': 'Hazırkı şifrə yanlışdır.'}), 400
+    if len(new_password) < 8:
+        return jsonify({'error': 'Yeni şifrə ən azı 8 simvoldan ibarət olmalıdır.'}), 400
+    if new_password != (data.get('confirm_password') or ''):
+        return jsonify({'error': 'Şifrələr uyğun gəlmir.'}), 400
+    if new_password == current_password:
+        return jsonify({'error': 'Yeni şifrə köhnəsindən fərqli olmalıdır.'}), 400
+
+    current_user.set_password_hash(generate_password_hash(new_password))
+    current_user.must_change_password = False
+    db.session.commit()
+    # Other devices are signed out; keep this one signed in.
+    login_user(current_user._get_current_object())
+    return jsonify({'user': user_to_dict(current_user)})
 
 
 @app.route('/api/vip/request', methods=['POST'])
 @login_required
 def api_request_vip():
+    if current_user.is_staff_member:
+        return jsonify({'error': 'Komanda üzvlərinin artıq Member kartı var.'}), 400
     if current_user.is_vip and current_user.vip_status == 'active':
         return jsonify({'error': 'Siz artıq VIP üzvsünüz.'}), 400
     if current_user.vip_status == 'pending':
@@ -392,8 +478,9 @@ def api_request_vip():
 @app.route('/api/account/qr.svg')
 @login_required
 def api_account_qr():
-    if not current_user.is_vip or current_user.vip_status != 'active' or not current_user.qr_token:
-        abort(404)
+    if not current_user.qr_token:
+        current_user.ensure_card()
+        db.session.commit()
 
     factory = qrcode.image.svg.SvgPathImage
     value = checkin_service.encode_qr_value(current_user)
@@ -419,11 +506,11 @@ def login():
 
         if user and check_password_hash(user.password, password):
             login_user(user)
-            flash('Successfully logged in!', 'success')
 
             next_page = request.args.get('next')
 
-            if not next_page or not next_page.startswith('/'):
+            # Only same-site paths: "//host" and "/\\host" would leave the site.
+            if not next_page or not next_page.startswith('/') or next_page[1:2] in ('/', '\\'):
                 next_page = url_for('admin_dashboard')
 
             return redirect(next_page)
@@ -451,6 +538,7 @@ def admin_dashboard():
     total_vip = User.query.filter_by(is_vip=True, vip_status='active').count()
     pending_vip = Payment.query.filter_by(status='pending').count()
     total_events = Event.query.count()
+    pending_applications = Application.query.filter_by(status='pending').count()
 
     return render_template('admin/dashboard.html',
                          recent_news=recent_news,
@@ -461,6 +549,7 @@ def admin_dashboard():
                          total_members=total_members,
                          total_vip=total_vip,
                          pending_vip=pending_vip,
+                         pending_applications=pending_applications,
                          total_events=total_events)
 
 @app.route('/admin/settings', methods=['GET', 'POST'])
@@ -481,8 +570,10 @@ def admin_settings():
         elif new_password != confirm_password:
             flash('New passwords do not match.', 'danger')
         else:
-            current_user.password = generate_password_hash(new_password)
+            current_user.set_password_hash(generate_password_hash(new_password))
             db.session.commit()
+            # Other devices are signed out; keep this one signed in.
+            login_user(current_user._get_current_object())
             flash('Password updated successfully.', 'success')
             return redirect(url_for('admin_settings'))
 
@@ -511,8 +602,8 @@ def delete_message(message_id):
     message = ContactMessage.query.get_or_404(message_id)
     db.session.delete(message)
     db.session.commit()
-    flash('Message deleted successfully!', 'success')
-    return redirect(url_for('admin_dashboard'))
+    flash('Message deleted.', 'success')
+    return redirect(url_for('list_messages'))
 @app.route('/admin/messages')
 @admin_required
 def list_messages():
@@ -528,149 +619,218 @@ def list_messages():
             (ContactMessage.message.ilike(f'%{search}%'))
         )
 
-    messages = query.order_by(ContactMessage.created_at.desc()).paginate(page=page, per_page=5, error_out=False)
+    messages = query.order_by(ContactMessage.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
 
     return render_template('admin/messages/list.html',
                          messages=messages,
                          search=search,
                          unread_count=unread_count)
-@app.route('/admin/opportunities')
-@login_required
+STATUS_MODES = ('auto', 'present', 'finished')
+
+
+def _parse_date(value):
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date() if value else None
+    except ValueError:
+        return None
+
+
+def _project_form_errors(form):
+    errors = []
+    if not form.get('title', '').strip():
+        errors.append('Title is required.')
+    if not form.get('description', '').strip():
+        errors.append('Description is required.')
+    start, end = _parse_date(form.get('start_date')), _parse_date(form.get('end_date'))
+    if start and end and end < start:
+        errors.append('The end date cannot be before the start date.')
+    return errors
+
+
+def _apply_project_form(project, form, stale):
+    """Copy the form and uploads onto project. Returns upload error strings."""
+    project.title = form['title'].strip()
+    project.description = form['description'].strip()
+    project.requirements = form.get('requirements', '').strip() or None
+    project.location = form.get('location', '').strip() or None
+    project.start_date = _parse_date(form.get('start_date'))
+    project.end_date = _parse_date(form.get('end_date'))
+    deadline = _parse_date(form.get('deadline'))
+    project.deadline = datetime.combine(deadline, datetime.max.time()) if deadline else None
+    mode = form.get('status_mode')
+    project.status_mode = mode if mode in STATUS_MODES else 'auto'
+    project.accepts_applications = 'accepts_applications' in form
+    project.is_active = 'is_active' in form
+
+    wanted = {t.strip() for t in form.get('tags', '').split(',') if t.strip()}
+    for tag in list(project.tags):
+        if tag.name not in wanted:
+            project.tags.remove(tag)
+    for name in sorted(wanted - {t.name for t in project.tags}):
+        project.tags.append(OpportunityTag(name=name[:50]))
+
+    errors = []
+    poster = request.files.get('poster')
+    if poster and poster.filename:
+        try:
+            new_path = upload_service.save_photo(
+                poster, app.static_folder, app.static_url_path or '/static', folder='projects', kind='posters'
+            )
+            if project.poster_path:
+                stale.append(project.poster_path)
+            project.poster_path = new_path
+        except upload_service.UploadError as e:
+            errors.append(str(e))
+    elif form.get('remove_poster') and project.poster_path:
+        stale.append(project.poster_path)
+        project.poster_path = None
+
+    _apply_photo_edits(project, form, stale)
+    errors.extend(_add_uploaded_photos(project, OpportunityPhoto, 'projects'))
+    return errors
+
+
+def _project_form_values(project):
+    if project is None:
+        return {}
+    return {'deadline': project.deadline.strftime('%Y-%m-%d') if project.deadline else ''}
+
+
+@app.route('/admin/projects')
 @admin_required
 def list_opportunities():
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '')
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
 
     query = Opportunity.query
     if search:
         query = query.filter(Opportunity.title.ilike(f'%{search}%'))
 
-    items = query.order_by(Opportunity.created_at.desc()).paginate(page=page, per_page=5, error_out=False)
+    items = query.order_by(Opportunity.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
+    return render_template('admin/opportunities/list.html', items=items, search=search)
 
-    return render_template('admin/opportunities/list.html',
-                         items=items,
-                         search=search,
-                         unread_count=unread_count)
 
-@app.route('/admin/opportunities/add', methods=['GET', 'POST'])
+@app.route('/admin/projects/add', methods=['GET', 'POST'])
 @admin_required
 def add_opportunity():
     if request.method == 'POST':
-        try:
-            title = request.form.get('title')
-            description = request.form.get('description')
-            requirements = request.form.get('requirements')
-            location = request.form.get('location')
-            deadline_str = request.form.get('deadline')
-            is_active = 'is_active' in request.form
+        errors = _project_form_errors(request.form)
+        if errors:
+            for e in errors:
+                flash(e, 'error')
+            return render_template('admin/opportunities/form.html', project=None, form=request.form, **_project_form_values(None))
 
-            deadline = None
-            if deadline_str:
-                deadline = datetime.strptime(deadline_str, '%Y-%m-%d')
-                deadline = datetime.combine(deadline, datetime.max.time(), tzinfo=timezone.utc)
+        project = Opportunity()
+        upload_errors = _apply_project_form(project, request.form, stale=[])
+        db.session.add(project)
+        db.session.commit()
+        for e in upload_errors:
+            flash(e, 'error')
+        flash('Project created.', 'success')
+        return redirect(url_for('edit_opportunity', id=project.id) if upload_errors else url_for('list_opportunities'))
 
-            opportunity = Opportunity(
-                title=title,
-                description=description,
-                requirements=requirements,
-                location=location,
-                deadline=deadline,
-                is_active=is_active
-            )
+    return render_template('admin/opportunities/form.html', project=None, form={}, **_project_form_values(None))
 
-            tags_str = request.form.get('tags', '').strip()
-            if tags_str:
-                tags = [tag.strip() for tag in tags_str.split(',') if tag.strip()]
-                for tag_name in tags:
-                    tag = OpportunityTag(name=tag_name, opportunity=opportunity)
-                    db.session.add(tag)
 
-            db.session.add(opportunity)
-            db.session.commit()
-
-            flash('Opportunity added successfully!', 'success')
-            return redirect(url_for('list_opportunities'))
-
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error adding opportunity: {str(e)}', 'danger')
-
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
-    return render_template('admin/opportunities/add.html', unread_count=unread_count)
-
-@app.route('/admin/opportunities/edit/<int:id>', methods=['GET', 'POST'])
+@app.route('/admin/projects/edit/<int:id>', methods=['GET', 'POST'])
 @admin_required
 def edit_opportunity(id):
-    opportunity = Opportunity.query.get_or_404(id)
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
+    project = Opportunity.query.get_or_404(id)
 
     if request.method == 'POST':
-        try:
-            deadline_str = request.form.get('deadline')
-            deadline = None
-            if deadline_str:
-                deadline = datetime.strptime(deadline_str, '%Y-%m-%d')
-                deadline = datetime.combine(deadline, datetime.max.time(), tzinfo=timezone.utc)
+        errors = _project_form_errors(request.form)
+        if errors:
+            for e in errors:
+                flash(e, 'error')
+            return render_template('admin/opportunities/form.html', project=project, form=request.form, **_project_form_values(project))
 
-            opportunity.title = request.form['title']
-            opportunity.description = request.form['description']
-            opportunity.requirements = request.form.get('requirements')
-            opportunity.location = request.form.get('location')
-            opportunity.deadline = deadline
-            opportunity.is_active = 'is_active' in request.form
+        stale = []
+        upload_errors = _apply_project_form(project, request.form, stale)
+        db.session.commit()
+        _delete_files(stale)
+        for e in upload_errors:
+            flash(e, 'error')
+        flash('Project updated.', 'success')
+        return redirect(url_for('edit_opportunity', id=project.id) if upload_errors else url_for('list_opportunities'))
 
-            existing_tags = {tag.name for tag in opportunity.tags}
-            new_tags_str = request.form.get('tags', '').strip()
-            new_tags = {tag.strip() for tag in new_tags_str.split(',') if tag.strip()}
+    return render_template('admin/opportunities/form.html', project=project, form={}, **_project_form_values(project))
 
-            for tag in list(opportunity.tags):
-                if tag.name not in new_tags:
-                    db.session.delete(tag)
 
-            for tag_name in new_tags - existing_tags:
-                tag = OpportunityTag(name=tag_name, opportunity=opportunity)
-                db.session.add(tag)
-
-            db.session.commit()
-            flash('Opportunity updated successfully!', 'success')
-            return redirect(url_for('list_opportunities'))
-
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error updating opportunity: {str(e)}', 'danger')
-
-    deadline = ''
-    if opportunity.deadline:
-        if opportunity.deadline.tzinfo:
-            deadline = opportunity.deadline.astimezone(timezone.utc).strftime('%Y-%m-%d')
-        else:
-            deadline = opportunity.deadline.strftime('%Y-%m-%d')
-
-    return render_template('admin/opportunities/edit.html',
-                         opportunity=opportunity,
-                         deadline=deadline,
-                         unread_count=unread_count)
-
-@app.route('/admin/opportunities/delete/<int:id>', methods=['POST'])
+@app.route('/admin/projects/delete/<int:id>', methods=['POST'])
 @admin_required
 def delete_opportunity(id):
-    opportunity = Opportunity.query.get_or_404(id)
-    try:
-        db.session.delete(opportunity)
-        db.session.commit()
-        flash('Opportunity deleted successfully!', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error deleting opportunity: {str(e)}', 'danger')
+    project = Opportunity.query.get_or_404(id)
+    paths = [project.poster_path] + [p.path for p in project.photos]
+    db.session.delete(project)
+    db.session.commit()
+    _delete_files(paths)
+    flash('Project deleted.', 'success')
     return redirect(url_for('list_opportunities'))
+
+
+# ---- admin: project applications ----
+
+APPLICATION_STATUSES = ('pending', 'accepted', 'rejected')
+
+
+def _filtered_applications():
+    project_id = request.args.get('project', type=int)
+    status = request.args.get('status', '')
+    query = Application.query
+    if project_id:
+        query = query.filter_by(opportunity_id=project_id)
+    if status in APPLICATION_STATUSES:
+        query = query.filter_by(status=status)
+    return query.order_by(Application.applied_at.desc()), project_id, status
+
+
+@app.route('/admin/applications')
+@admin_required
+def list_applications():
+    query, project_id, status = _filtered_applications()
+    page = request.args.get('page', 1, type=int)
+    items = query.paginate(page=page, per_page=20, error_out=False)
+    project = db.session.get(Opportunity, project_id) if project_id else None
+    return render_template('admin/applications/list.html', items=items, project=project, project_id=project_id, status=status)
+
+
+@app.route('/admin/applications/export.csv')
+@admin_required
+def export_applications():
+    query, _, _ = _filtered_applications()
+    rows = [(
+        a.opportunity.title, a.full_name, a.email, a.phone, a.birth_date, a.residence,
+        a.english_level, a.motivation, a.cv_link, a.status,
+        a.applied_at.strftime('%Y-%m-%d %H:%M') if a.applied_at else '',
+    ) for a in query.all()]
+    return _csv_response(
+        ['Project', 'Full name', 'Email', 'Phone', 'Birth date', 'Residence', 'English', 'Motivation', 'CV link', 'Status', 'Applied at (UTC)'],
+        rows, 'applications.csv',
+    )
+
+
+@app.route('/admin/applications/<int:id>', methods=['GET', 'POST'])
+@admin_required
+def view_application(id):
+    application = Application.query.get_or_404(id)
+    if request.method == 'POST':
+        status = request.form.get('status')
+        if status in APPLICATION_STATUSES:
+            application.status = status
+        application.admin_note = request.form.get('admin_note', '').strip() or None
+        db.session.commit()
+        flash('Application updated.', 'success')
+        return redirect(url_for('view_application', id=application.id))
+    return render_template('admin/applications/detail.html', application=application)
+
+
 @app.route('/opportunities')
 def opportunities():
-    return serve_spa()
+    return redirect('/projects', code=301)
 
 @app.route('/opportunity/<int:id>')
 def view_opportunity(id):
-    return serve_spa()
+    return redirect(f'/projects/{id}', code=301)
 @app.route('/admin/news')
 @login_required
 @admin_required
@@ -683,7 +843,7 @@ def list_news():
     if search:
         query = query.filter(News.title.ilike(f'%{search}%'))
 
-    items = query.order_by(News.created_at.desc()).paginate(page=page, per_page=5, error_out=False)
+    items = query.order_by(News.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
 
     return render_template('admin/news/list.html',
                          items=items,
@@ -756,157 +916,249 @@ def news():
 @app.route('/news/<int:id>')
 def news_detail(id):
     return serve_spa()
-@app.route('/admin/blog')
-@login_required
+STORY_PROGRAMS = [
+    'Erasmus+ Youth Exchange',
+    'Erasmus+ Training Course',
+    'European Solidarity Corps',
+    'Other',
+]
+
+_SLUG_TRANSLIT = str.maketrans({
+    'ə': 'e', 'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
+    'Ə': 'e', 'Ç': 'c', 'Ğ': 'g', 'I': 'i', 'İ': 'i', 'Ö': 'o', 'Ş': 's', 'Ü': 'u',
+})
+
+
+def unique_story_slug(title, exclude_id=None):
+    base = re.sub(r'[^a-z0-9]+', '-', title.translate(_SLUG_TRANSLIT).lower()).strip('-')[:80] or 'story'
+    slug, n = base, 2
+    while True:
+        q = Story.query.filter_by(slug=slug)
+        if exclude_id:
+            q = q.filter(Story.id != exclude_id)
+        if not q.first():
+            return slug
+        slug, n = f'{base}-{n}', n + 1
+
+
+def _story_form_errors(form):
+    errors = []
+    if not form.get('title', '').strip():
+        errors.append('Title is required.')
+    if not form.get('author_name', '').strip():
+        errors.append("Participant's name is required.")
+    if not form.get('content', '').strip():
+        errors.append('The story text is required.')
+    return errors
+
+
+def _add_uploaded_photos(owner, photo_model, folder):
+    """Append the request's `photos` files to owner.photos. Returns error strings."""
+    errors = []
+    next_pos = max((p.position for p in owner.photos), default=-1) + 1
+    for f in request.files.getlist('photos'):
+        if not f or not f.filename:
+            continue
+        try:
+            path = upload_service.save_photo(f, app.static_folder, app.static_url_path or '/static', folder=folder)
+            owner.photos.append(photo_model(path=path, position=next_pos))
+            next_pos += 1
+        except upload_service.UploadError as e:
+            errors.append(str(e))
+    return errors
+
+
+def _apply_photo_edits(owner, form, stale):
+    """Apply the photo manager's removals and drag-and-drop order."""
+    remove_ids = {int(x) for x in form.getlist('remove_photos') if x.isdigit()}
+    for photo in list(owner.photos):
+        if photo.id in remove_ids:
+            stale.append(photo.path)
+            owner.photos.remove(photo)
+
+    # Order arrives as "id,id,id".
+    order = [int(x) for x in form.get('photo_order', '').split(',') if x.isdigit()]
+    rank = {pid: i for i, pid in enumerate(order)}
+    for photo in owner.photos:
+        photo.position = rank.get(photo.id, len(rank) + photo.position)
+
+
+def _delete_files(paths):
+    for path in paths:
+        upload_service.delete_upload(path, app.static_folder, app.static_url_path or '/static')
+
+
+def _csv_response(header, rows, filename):
+    def safe(value):
+        # Names come from the public: stop spreadsheets running them as formulas.
+        text = '' if value is None else str(value)
+        return "'" + text if text[:1] in ('=', '+', '-', '@', '\t', '\r') else text
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(header)
+    for row in rows:
+        writer.writerow([safe(v) for v in row])
+    # BOM so Excel reads Azerbaijani letters correctly.
+    return Response('\ufeff' + buf.getvalue(), mimetype='text/csv', headers={
+        'Content-Disposition': f'attachment; filename={filename}'
+    })
+
+
+def _apply_story_uploads(story, stale):
+    """Save avatar/photos from the request onto `story`.
+
+    Replaced files are appended to `stale` so the caller can delete them once
+    the database commit has succeeded. Returns a list of error strings.
+    """
+    errors = []
+    static = app.static_folder
+    url_base = app.static_url_path or '/static'
+
+    avatar = request.files.get('avatar')
+    if avatar and avatar.filename:
+        try:
+            new_path = upload_service.save_avatar(avatar, static, url_base)
+            if story.avatar_path:
+                stale.append(story.avatar_path)
+            story.avatar_path = new_path
+        except upload_service.UploadError as e:
+            errors.append(str(e))
+
+    errors.extend(_add_uploaded_photos(story, StoryPhoto, 'stories'))
+    return errors
+
+
+def _story_admin_context(**extra):
+    return {
+        'unread_count': ContactMessage.query.filter_by(is_read=False).count(),
+        'programs': STORY_PROGRAMS,
+        **extra,
+    }
+
+
+@app.route('/admin/stories')
 @admin_required
-def list_blog_posts():
+def list_stories():
     page = request.args.get('page', 1, type=int)
-    search = request.args.get('search', '')
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
+    search = request.args.get('search', '').strip()
 
-    query = BlogPost.query
-
+    query = Story.query
     if search:
         query = query.filter(
-            (BlogPost.title.ilike(f'%{search}%')) |
-            (BlogPost.content.ilike(f'%{search}%'))
+            Story.title.ilike(f'%{search}%') | Story.author_name.ilike(f'%{search}%')
         )
+    items = query.order_by(Story.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
+    return render_template('admin/stories/list.html', **_story_admin_context(items=items, search=search))
 
-    posts = query.order_by(BlogPost.created_at.desc()).paginate(
-        page=page,
-        per_page=5,
-        error_out=False
-    )
 
-    return render_template('admin/blog/list.html',
-                         posts=posts,
-                         search=search,
-                         unread_count=unread_count)
-
-@app.route('/admin/blog/add', methods=['GET', 'POST'])
-@login_required
+@app.route('/admin/stories/add', methods=['GET', 'POST'])
 @admin_required
-def add_blog_post():
+def add_story():
     if request.method == 'POST':
-        title = request.form.get('title')
-        content = request.form.get('content')
-        excerpt = request.form.get('excerpt')
-        image_url = request.form.get('image_url')
-        is_published = 'is_published' in request.form
+        form = request.form
+        errors = _story_form_errors(form)
+        if errors:
+            for e in errors:
+                flash(e, 'error')
+            return render_template('admin/stories/form.html', **_story_admin_context(story=None, form=form))
 
-        if not title or not content:
-            flash('Title and content are required', 'error')
-            return redirect(url_for('add_blog_post'))
-
-        try:
-            new_post = BlogPost(
-                title=title,
-                content=content,
-                excerpt=excerpt,
-                image_url=image_url,
-                is_published=is_published
-            )
-
-            db.session.add(new_post)
-            db.session.commit()
-
-            flash('Blog post added successfully', 'success')
-            return redirect(url_for('list_blog_posts'))
-
-        except Exception as e:
-            db.session.rollback()
-            flash(f'An error occurred: {str(e)}', 'error')
-
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
-    return render_template('admin/blog/add.html', unread_count=unread_count)
-
-@app.route('/admin/blog/edit/<int:id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def edit_blog_post(id):
-    post = BlogPost.query.get_or_404(id)
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
-
-    if request.method == 'POST':
-        post.title = request.form.get('title', post.title)
-        post.content = request.form.get('content', post.content)
-        post.excerpt = request.form.get('excerpt', post.excerpt)
-        post.image_url = request.form.get('image_url', post.image_url)
-        post.is_published = 'is_published' in request.form
-
-        try:
-            db.session.commit()
-            flash('Blog post updated successfully', 'success')
-            return redirect(url_for('list_blog_posts'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'An error occurred: {str(e)}', 'error')
-
-    return render_template('admin/blog/edit.html', post=post, unread_count=unread_count)
-
-@app.route('/admin/blog/delete/<int:id>', methods=['POST'])
-@login_required
-@admin_required
-def delete_blog_post(id):
-    post = BlogPost.query.get_or_404(id)
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
-
-    try:
-        db.session.delete(post)
+        title = form['title'].strip()
+        story = Story(
+            title=title,
+            slug=unique_story_slug(title),
+            author_name=form['author_name'].strip(),
+            author_info=form.get('author_info', '').strip() or None,
+            program=form.get('program', '').strip() or None,
+            content=form['content'].strip(),
+            is_published='is_published' in form,
+        )
+        upload_errors = _apply_story_uploads(story, stale=[])
+        db.session.add(story)
         db.session.commit()
-        flash('Blog post deleted successfully', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'An error occurred: {str(e)}', 'error')
 
-    return redirect(url_for('list_blog_posts'))
+        for e in upload_errors:
+            flash(e, 'error')
+        flash('Story created.', 'success')
+        return redirect(url_for('edit_story', id=story.id) if upload_errors else url_for('list_stories'))
 
-@app.route('/blog')
-def blog():
-    search_query = request.args.get('search', '')
-    sort_by = request.args.get('sort', 'newest')
-    page = request.args.get('page', 1, type=int)
-    per_page = 9
+    return render_template('admin/stories/form.html', **_story_admin_context(story=None, form={}))
 
-    query = BlogPost.query.filter_by(is_published=True)
 
-    if search_query:
-        query = query.filter(
-            (BlogPost.title.ilike(f'%{search_query}%')) |
-            (BlogPost.content.ilike(f'%{search_query}%'))
-        )
+@app.route('/admin/stories/edit/<int:id>', methods=['GET', 'POST'])
+@admin_required
+def edit_story(id):
+    story = Story.query.get_or_404(id)
 
-    if sort_by == 'alphabetical':
-        query = query.order_by(BlogPost.title.asc())
-    elif sort_by == 'oldest':
-        query = query.order_by(BlogPost.created_at.asc())
-    else:
-        query = query.order_by(BlogPost.created_at.desc())
+    if request.method == 'POST':
+        form = request.form
+        errors = _story_form_errors(form)
+        if errors:
+            for e in errors:
+                flash(e, 'error')
+            return render_template('admin/stories/form.html', **_story_admin_context(story=story, form=form))
 
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        title = form['title'].strip()
+        if title != story.title:
+            story.slug = unique_story_slug(title, exclude_id=story.id)
+        story.title = title
+        story.author_name = form['author_name'].strip()
+        story.author_info = form.get('author_info', '').strip() or None
+        story.program = form.get('program', '').strip() or None
+        story.content = form['content'].strip()
+        story.is_published = 'is_published' in form
 
-    return render_template('blog.html',
-                         posts=pagination,
-                         search=search_query,
-                         current_sort=sort_by,
-                         title='Youth Blog - IYDP')
-@app.route('/blog/<string:slug>')
-def blog_post(slug):
-    post = BlogPost.query.filter_by(slug=slug, is_published=True).first_or_404()
+        stale = []
+        if form.get('remove_avatar') and story.avatar_path:
+            stale.append(story.avatar_path)
+            story.avatar_path = None
 
-    post.view_count += 1
+        _apply_photo_edits(story, form, stale)
+
+        upload_errors = _apply_story_uploads(story, stale)
+        db.session.commit()
+        for path in stale:
+            upload_service.delete_upload(path, app.static_folder, app.static_url_path or '/static')
+
+        for e in upload_errors:
+            flash(e, 'error')
+        flash('Story updated.', 'success')
+        return redirect(url_for('edit_story', id=story.id) if upload_errors else url_for('list_stories'))
+
+    return render_template('admin/stories/form.html', **_story_admin_context(story=story, form={}))
+
+
+@app.route('/admin/stories/delete/<int:id>', methods=['POST'])
+@admin_required
+def delete_story(id):
+    story = Story.query.get_or_404(id)
+    static, url_base = app.static_folder, app.static_url_path or '/static'
+    paths = [story.avatar_path] + [p.path for p in story.photos]
+    db.session.delete(story)
     db.session.commit()
+    for path in paths:
+        upload_service.delete_upload(path, static, url_base)
+    flash('Story deleted.', 'success')
+    return redirect(url_for('list_stories'))
 
-    related_posts = BlogPost.query.filter(
-        BlogPost.id != post.id,
-        BlogPost.is_published == True
-    ).order_by(BlogPost.created_at.desc()).limit(3).all()
 
-    return render_template('blog_detail.html', post=post, related_posts=related_posts)
+@app.errorhandler(413)
+def upload_too_large(_e):
+    if request.path.startswith('/admin/'):
+        flash('The upload is too large (80 MB max per save). Add the photos in smaller batches.', 'error')
+        return redirect(request.path)
+    return jsonify({'error': 'payload_too_large'}), 413
 
-# ══════════════════════════════════════════════════════════════
-# ADMIN — MEMBERS & VIP MEMBERSHIP
-# ══════════════════════════════════════════════════════════════
+
+@app.route('/stories')
+def stories_page():
+    return serve_spa()
+
+
+@app.route('/stories/<string:slug>')
+def story_page(slug):
+    return serve_spa()
+
 
 @app.route('/admin/members')
 @admin_required
@@ -927,8 +1179,10 @@ def list_members():
         query = query.filter(User.vip_status == 'active')
     elif vip_filter == 'pending':
         query = query.filter(User.vip_status == 'pending')
+    elif vip_filter == 'staff':
+        query = query.filter(User.is_staff_member == True)  # noqa: E712
     elif vip_filter == 'none':
-        query = query.filter(User.vip_status.in_(['none', 'revoked']))
+        query = query.filter(User.vip_status.in_(['none', 'revoked']), User.is_staff_member == False)  # noqa: E712
 
     members = query.order_by(User.created_at.desc()).paginate(page=page, per_page=10, error_out=False)
 
@@ -941,7 +1195,10 @@ def list_members():
 @admin_required
 def view_member(id):
     member = User.query.filter_by(id=id, is_admin=False).first_or_404()
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
+    return _render_member_detail(member)
+
+
+def _render_member_detail(member, temp_password=None):
     payments = Payment.query.filter_by(user_id=member.id).order_by(Payment.created_at.desc()).all()
     attendances = (
         Attendance.query.filter_by(user_id=member.id)
@@ -949,7 +1206,21 @@ def view_member(id):
     )
     return render_template('admin/members/detail.html',
                          member=member, payments=payments, attendances=attendances,
-                         unread_count=unread_count)
+                         temp_password=temp_password)
+
+
+@app.route('/admin/members/<int:id>/reset-password', methods=['POST'])
+@admin_required
+@limiter.limit('20 per minute')
+def reset_member_password(id):
+    # Admin accounts are excluded: they change their own password in Settings.
+    member = User.query.filter_by(id=id, is_admin=False).first_or_404()
+    temp_password = secrets.token_urlsafe(9)
+    member.set_password_hash(generate_password_hash(temp_password))
+    member.must_change_password = True
+    db.session.commit()
+    # Rendered here, not flashed: flash messages live in the session cookie.
+    return Response(_render_member_detail(member, temp_password), headers={'Cache-Control': 'no-store'})
 
 
 @app.route('/admin/members/<int:id>/vip/activate', methods=['POST'])
@@ -990,12 +1261,19 @@ def deactivate_member_vip(id):
 @admin_required
 def regenerate_member_qr(id):
     member = User.query.filter_by(id=id, is_admin=False).first_or_404()
-    if not member.is_vip:
-        flash('This user is not a VIP member.', 'danger')
-        return redirect(url_for('view_member', id=member.id))
     vip_service.regenerate_qr_token(member)
     db.session.commit()
     flash('A new QR code has been issued. The old card will no longer work.', 'success')
+    return redirect(url_for('view_member', id=member.id))
+
+
+@app.route('/admin/members/<int:id>/staff', methods=['POST'])
+@admin_required
+def set_member_staff(id):
+    member = User.query.filter_by(id=id, is_admin=False).first_or_404()
+    member.is_staff_member = request.form.get('is_staff') == '1'
+    db.session.commit()
+    flash(f'{member.display_name} now has the {member.card_label} card.', 'success')
     return redirect(url_for('view_member', id=member.id))
 
 
@@ -1052,116 +1330,134 @@ def list_events():
     return render_template('admin/events/list.html', items=items, search=search, unread_count=unread_count)
 
 
+def _event_form_errors(form):
+    errors = []
+    if not form.get('name', '').strip():
+        errors.append('Please enter an event name.')
+    capacity = form.get('capacity', '').strip()
+    if capacity and (not capacity.isdigit() or int(capacity) < 1):
+        errors.append('The seat limit must be a positive number, or empty for no limit.')
+    return errors
+
+
+def _apply_event_form(event, form, stale):
+    event.name = form['name'].strip()
+    event.description = form.get('description', '').strip() or None
+    event.location = form.get('location', '').strip() or None
+    try:
+        event.starts_at = datetime.strptime(form.get('starts_at', ''), '%Y-%m-%dT%H:%M')
+    except ValueError:
+        event.starts_at = None
+    capacity = form.get('capacity', '').strip()
+    event.capacity = int(capacity) if capacity else None
+    event.is_public = 'is_public' in form
+    event.is_active = 'is_active' in form
+
+    poster = request.files.get('poster')
+    if poster and poster.filename:
+        try:
+            new_path = upload_service.save_photo(
+                poster, app.static_folder, app.static_url_path or '/static', folder='events', kind='posters'
+            )
+            if event.poster_path:
+                stale.append(event.poster_path)
+            event.poster_path = new_path
+        except upload_service.UploadError as e:
+            return [str(e)]
+    elif form.get('remove_poster') and event.poster_path:
+        stale.append(event.poster_path)
+        event.poster_path = None
+    return []
+
+
 @app.route('/admin/events/add', methods=['GET', 'POST'])
 @admin_required
 def add_event():
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
-
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        description = request.form.get('description', '').strip()
-        location = request.form.get('location', '').strip()
-        starts_at_str = request.form.get('starts_at')
-        is_active = 'is_active' in request.form
+        errors = _event_form_errors(request.form)
+        if errors:
+            for e in errors:
+                flash(e, 'error')
+            return render_template('admin/events/form.html', event=None, form=request.form)
 
-        if not name:
-            flash('Please enter an event name.', 'danger')
-            return redirect(url_for('add_event'))
-
-        starts_at = None
-        if starts_at_str:
-            try:
-                starts_at = datetime.strptime(starts_at_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                starts_at = None
-
-        event = Event(name=name, description=description or None, location=location or None,
-                       starts_at=starts_at, is_active=is_active)
+        event = Event()
+        upload_errors = _apply_event_form(event, request.form, stale=[])
         db.session.add(event)
         db.session.commit()
+        for e in upload_errors:
+            flash(e, 'error')
         flash('Event created.', 'success')
-        return redirect(url_for('list_events'))
+        return redirect(url_for('edit_event', id=event.id) if upload_errors else url_for('list_events'))
 
-    return render_template('admin/events/add.html', unread_count=unread_count)
+    return render_template('admin/events/form.html', event=None, form={})
 
 
 @app.route('/admin/events/edit/<int:id>', methods=['GET', 'POST'])
 @admin_required
 def edit_event(id):
     event = Event.query.get_or_404(id)
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
 
     if request.method == 'POST':
-        event.name = request.form.get('name', event.name).strip()
-        event.description = request.form.get('description', '').strip() or None
-        event.location = request.form.get('location', '').strip() or None
-        starts_at_str = request.form.get('starts_at')
-        if starts_at_str:
-            try:
-                event.starts_at = datetime.strptime(starts_at_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-        event.is_active = 'is_active' in request.form
+        errors = _event_form_errors(request.form)
+        if errors:
+            for e in errors:
+                flash(e, 'error')
+            return render_template('admin/events/form.html', event=event, form=request.form)
 
+        stale = []
+        upload_errors = _apply_event_form(event, request.form, stale)
         db.session.commit()
+        _delete_files(stale)
+        for e in upload_errors:
+            flash(e, 'error')
         flash('Event updated.', 'success')
-        return redirect(url_for('list_events'))
+        return redirect(url_for('event_attendance', id=event.id))
 
-    starts_at_value = event.starts_at.strftime('%Y-%m-%dT%H:%M') if event.starts_at else ''
-    return render_template('admin/events/edit.html', event=event, starts_at_value=starts_at_value, unread_count=unread_count)
+    return render_template('admin/events/form.html', event=event, form={})
 
 
 @app.route('/admin/events/delete/<int:id>', methods=['POST'])
 @admin_required
 def delete_event(id):
     event = Event.query.get_or_404(id)
+    poster = event.poster_path
     db.session.delete(event)
     db.session.commit()
+    _delete_files([poster])
     flash('Event deleted.', 'success')
     return redirect(url_for('list_events'))
+
+
+def _event_people(event):
+    """Everyone registered or checked in, as (user, registered_at, checked_in_at) rows."""
+    checked_in = {a.user_id: a for a in event.attendances}
+    people = [(r.user, r.created_at, checked_in.pop(r.user_id).checked_in_at if r.user_id in checked_in else None)
+              for r in event.registrations]
+    # Whoever is left walked in without registering.
+    people += [(a.user, None, a.checked_in_at) for a in checked_in.values()]
+    return people
 
 
 @app.route('/admin/events/<int:id>/attendance')
 @admin_required
 def event_attendance(id):
     event = Event.query.get_or_404(id)
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
-
-    attendances = (
-        Attendance.query.filter_by(event_id=event.id)
-        .order_by(Attendance.checked_in_at.desc()).all()
-    )
-    total_vip = User.query.filter_by(is_vip=True, vip_status='active').count()
-
-    return render_template('admin/events/attendance.html',
-                         event=event, attendances=attendances,
-                         total_vip=total_vip, unread_count=unread_count)
+    return render_template('admin/events/attendance.html', event=event, people=_event_people(event))
 
 
 @app.route('/admin/events/<int:id>/attendance/export.csv')
 @admin_required
 def export_event_attendance(id):
     event = Event.query.get_or_404(id)
-    attendances = (
-        Attendance.query.filter_by(event_id=event.id)
-        .order_by(Attendance.checked_in_at.asc()).all()
+    rows = [(
+        u.membership_no, u.card_label, u.full_name, u.email, u.phone,
+        registered.strftime('%Y-%m-%d %H:%M') if registered else '',
+        checked.strftime('%Y-%m-%d %H:%M') if checked else '',
+    ) for u, registered, checked in _event_people(event)]
+    return _csv_response(
+        ['Membership No', 'Card', 'Full Name', 'Email', 'Phone', 'Registered At (UTC)', 'Checked In At (UTC)'],
+        rows, f'attendance-event-{event.id}.csv',
     )
-
-    lines = ['Membership No,Full Name,Email,Phone,Checked In At (UTC)']
-    for a in attendances:
-        m = a.user
-        row = [
-            m.membership_no or '', m.full_name or '', m.email or '', m.phone or '',
-            a.checked_in_at.strftime('%Y-%m-%d %H:%M') if a.checked_in_at else '',
-        ]
-        escaped = ['"' + str(v).replace('"', '""') + '"' for v in row]
-        lines.append(','.join(escaped))
-
-    csv_data = '\n'.join(lines)
-    filename = f'attendance-event-{event.id}.csv'
-    return Response(csv_data, mimetype='text/csv', headers={
-        'Content-Disposition': f'attachment; filename={filename}'
-    })
 
 
 @app.route('/admin/scanner')
@@ -1185,27 +1481,23 @@ def scanner_checkin():
 
     status, payload = checkin_service.check_in(event, code, current_user)
 
-    if status == 'ok':
-        db.session.commit()
+    if status in ('ok', 'duplicate'):
         member = payload.user
-        return jsonify({
-            'status': 'ok',
+        registered = EventRegistration.query.filter_by(event_id=event.id, user_id=member.id).first() is not None
+        result = {
+            'status': status,
             'name': member.display_name,
             'membership_no': member.membership_no,
+            'card': member.card_label,
+            'card_type': member.card_type,
+            'registered': registered,
             'time': payload.checked_in_at.strftime('%H:%M'),
-        })
-    if status == 'duplicate':
-        db.session.rollback()
-        member = payload.user
-        return jsonify({
-            'status': 'duplicate',
-            'name': member.display_name,
-            'membership_no': member.membership_no,
-            'time': payload.checked_in_at.strftime('%H:%M'),
-        })
-    if status == 'not_vip':
-        db.session.rollback()
-        return jsonify({'status': 'not_vip', 'name': payload.display_name if payload else None})
+        }
+        if status == 'ok':
+            db.session.commit()
+        else:
+            db.session.rollback()
+        return jsonify(result)
 
     db.session.rollback()
     return jsonify({'status': 'invalid', 'message': 'This QR code was not recognized.'})
@@ -1218,7 +1510,7 @@ def scanner_checkin():
 def api_home():
     opportunities = Opportunity.query.filter_by(is_active=True).order_by(Opportunity.created_at.desc()).limit(6).all()
     news = News.query.filter_by(is_published=True).order_by(News.created_at.desc()).limit(3).all()
-    posts = BlogPost.query.filter_by(is_published=True).order_by(BlogPost.created_at.desc()).limit(6).all()
+    stories = Story.query.filter_by(is_published=True).order_by(Story.created_at.desc()).limit(6).all()
 
     return jsonify({
         'opportunities': [{
@@ -1243,75 +1535,63 @@ def api_home():
             'view_count': n.view_count or 0,
             'created_at': n.created_at.isoformat() if n.created_at else None,
         } for n in news],
-        'posts': [{
-            'id': p.id,
-            'title': p.title,
-            'content': p.content,
-            'excerpt': p.excerpt,
-            'image_url': p.image_url,
-            'slug': p.slug,
-            'view_count': p.view_count or 0,
-            'created_at': p.created_at.isoformat() if p.created_at else None,
-        } for p in posts],
+        'stories': [story_card(st) for st in stories],
     })
 
 
-@app.route('/api/opportunities')
-def api_opportunities():
-    search_query = request.args.get('search', '')
-    sort_by = request.args.get('sort', 'newest')
-    current_status = request.args.get('status', '')
-    page = request.args.get('page', 1, type=int)
-    per_page = 9
-    now_ref = datetime.utcnow()
+def project_cover(o):
+    if o.poster_path:
+        return o.poster_path
+    return f'{app.static_url_path or "/static"}/esc/{o.keyword_image}' if o.keyword_image else None
 
-    query = Opportunity.query
+
+def project_to_dict(o):
+    return {
+        'id': o.id,
+        'title': o.title,
+        'description': o.description,
+        'requirements': o.requirements,
+        'location': o.location or 'Remote',
+        'start_date': o.start_date.isoformat() if o.start_date else None,
+        'end_date': o.end_date.isoformat() if o.end_date else None,
+        'deadline': o.deadline.isoformat() if o.deadline else None,
+        'phase': o.phase,
+        'accepts_applications': o.accepts_applications,
+        'deadline_passed': o.deadline_passed,
+        'applications_open': o.applications_open,
+        'poster': project_cover(o),
+        'view_count': o.view_count or 0,
+        'tags': [t.name for t in o.tags],
+        'created_at': o.created_at.isoformat() if o.created_at else None,
+    }
+
+
+@app.route('/api/projects')
+def api_projects():
+    search_query = request.args.get('search', '').strip()
+    phase = request.args.get('phase', 'present')
+    page = request.args.get('page', 1, type=int)
+
+    today = az_now_naive().date()
+    finished = or_(
+        Opportunity.status_mode == 'finished',
+        and_(Opportunity.status_mode == 'auto', Opportunity.end_date != None, Opportunity.end_date < today),  # noqa: E711
+    )
+    query = Opportunity.query.filter(Opportunity.is_active == True)  # noqa: E712
+    if phase == 'finished':
+        query = query.filter(finished).order_by(Opportunity.end_date.desc().nullslast(), Opportunity.created_at.desc())
+    else:
+        query = query.filter(~finished).order_by(Opportunity.created_at.desc())
 
     if search_query:
+        like = f'%{search_query}%'
         query = query.filter(
-            (Opportunity.title.ilike(f'%{search_query}%')) |
-            (Opportunity.location.ilike(f'%{search_query}%'))
+            Opportunity.title.ilike(like) | Opportunity.location.ilike(like) | Opportunity.description.ilike(like)
         )
 
-    if current_status == 'active':
-        query = query.filter(
-            Opportunity.is_active == True,
-            ((Opportunity.deadline == None) | (Opportunity.deadline >= now_ref))
-        )
-    elif current_status == 'closed':
-        query = query.filter(
-            (Opportunity.is_active == False) |
-            ((Opportunity.deadline != None) & (Opportunity.deadline < now_ref))
-        )
-    else:
-        query = query.filter(Opportunity.is_active == True)
-
-    if sort_by == 'alphabetical':
-        query = query.order_by(Opportunity.title.asc())
-    elif sort_by == 'deadline_soon':
-        query = query.order_by(Opportunity.deadline.asc().nullslast())
-    elif sort_by == 'oldest':
-        query = query.order_by(Opportunity.created_at.asc())
-    else:
-        query = query.order_by(Opportunity.created_at.desc())
-
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-
+    pagination = query.paginate(page=page, per_page=9, error_out=False)
     return jsonify({
-        'items': [{
-            'id': o.id,
-            'title': o.title,
-            'description': o.description,
-            'requirements': o.requirements,
-            'location': o.location or 'Remote',
-            'deadline': o.deadline.isoformat() if o.deadline else None,
-            'is_closed': bool(o.deadline and o.deadline < now_ref),
-            'keyword_image': o.keyword_image,
-            'view_count': o.view_count or 0,
-            'tags': [t.name for t in o.tags],
-            'applicant_count': len(o.applications),
-            'created_at': o.created_at.isoformat() if o.created_at else None,
-        } for o in pagination.items],
+        'items': [project_to_dict(o) for o in pagination.items],
         'total': pagination.total,
         'pages': pagination.pages,
         'current_page': pagination.page,
@@ -1320,29 +1600,186 @@ def api_opportunities():
     })
 
 
-@app.route('/api/opportunity/<int:id>')
-def api_opportunity(id):
-    o = Opportunity.query.get_or_404(id)
-    if not o.is_active:
+@app.route('/api/projects/<int:id>')
+def api_project(id):
+    o = db.session.get(Opportunity, id)
+    if not o or not o.is_active:
         return jsonify({'error': 'Not found'}), 404
 
     o.view_count = (o.view_count or 0) + 1
     db.session.commit()
 
+    mine = None
+    if current_user.is_authenticated:
+        mine = Application.query.filter_by(user_id=current_user.id, opportunity_id=o.id).first()
     return jsonify({
-        'id': o.id,
-        'title': o.title,
-        'description': o.description,
-        'requirements': o.requirements,
-        'location': o.location or 'Remote',
-        'deadline': o.deadline.isoformat() if o.deadline else None,
-        'is_closed': bool(o.deadline and o.deadline < datetime.utcnow()),
-        'keyword_image': o.keyword_image,
-        'view_count': o.view_count or 0,
-        'tags': [t.name for t in o.tags],
-        'applicant_count': len(o.applications),
-        'created_at': o.created_at.isoformat() if o.created_at else None,
+        **project_to_dict(o),
+        'photos': [p.path for p in o.photos],
+        'my_application': {
+            'status': mine.status,
+            'applied_at': mine.applied_at.isoformat() if mine.applied_at else None,
+        } if mine else None,
     })
+
+
+ENGLISH_LEVELS = ('Basic', 'Intermediate', 'Advanced', 'Fluent')
+
+
+@app.route('/api/projects/<int:id>/apply', methods=['POST'])
+@login_required
+@limiter.limit('10 per minute')
+def api_project_apply(id):
+    project = db.session.get(Opportunity, id)
+    if not project or not project.is_active:
+        return jsonify({'error': 'Not found'}), 404
+    if not project.applications_open:
+        return jsonify({'error': 'Applications for this project are closed.'}), 400
+
+    data = request.get_json(silent=True) or {}
+    field = lambda name: str(data.get(name) or '').strip()  # noqa: E731
+    full_name, email, phone = field('full_name'), field('email').lower(), field('phone')
+    residence, motivation, cv_link = field('residence'), field('motivation'), field('cv_link')
+    english_level = field('english_level')
+    birth_date = _parse_date(field('birth_date'))
+
+    errors = []
+    if not full_name or len(full_name) > 150:
+        errors.append('Please enter your full name.')
+    if not EMAIL_RE.match(email) or len(email) > 150:
+        errors.append('Please enter a valid email address.')
+    if not phone or len(phone) > 30:
+        errors.append('Please enter your phone number.')
+    if not birth_date or birth_date >= date.today():
+        errors.append('Please enter your date of birth.')
+    if not residence or len(residence) > 150:
+        errors.append('Please enter where you live.')
+    if english_level not in ENGLISH_LEVELS:
+        errors.append('Please choose your English level.')
+    if len(motivation) < 30:
+        errors.append('Please tell us a little more about your motivation (at least 30 characters).')
+    if len(motivation) > 5000:
+        errors.append('Your motivation text is too long (5000 characters at most).')
+    if cv_link and (len(cv_link) > 500 or not re.match(r'^https?://\S+$', cv_link)):
+        errors.append('The CV link must start with http:// or https://.')
+    if errors:
+        return jsonify({'error': errors[0], 'errors': errors}), 400
+
+    application = Application(
+        user_id=current_user.id, opportunity_id=project.id, full_name=full_name, email=email, phone=phone,
+        birth_date=birth_date, residence=residence, english_level=english_level, motivation=motivation,
+        cv_link=cv_link or None,
+    )
+    db.session.add(application)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': 'You have already applied to this project.'}), 409
+
+    return jsonify({
+        'my_application': {'status': application.status, 'applied_at': application.applied_at.isoformat()},
+    }), 201
+
+
+# ---- public events api ----
+
+def event_to_dict(e):
+    return {
+        'id': e.id,
+        'name': e.name,
+        'description': e.description,
+        'location': e.location,
+        'starts_at': e.starts_at.isoformat() if e.starts_at else None,
+        'poster': e.poster_path,
+        'capacity': e.capacity,
+        'spots_left': e.spots_left,
+        'has_started': e.has_started,
+        'registration_open': e.registration_open,
+    }
+
+
+def event_detail(e):
+    registered = current_user.is_authenticated and EventRegistration.query.filter_by(
+        event_id=e.id, user_id=current_user.id
+    ).first() is not None
+    return {**event_to_dict(e), 'is_registered': bool(registered)}
+
+
+@app.route('/api/events')
+def api_events():
+    when = request.args.get('when', 'upcoming')
+    page = request.args.get('page', 1, type=int)
+    now = az_now_naive()
+
+    query = Event.query.filter(Event.is_public == True)  # noqa: E712
+    if when == 'past':
+        query = query.filter(Event.starts_at != None, Event.starts_at <= now).order_by(Event.starts_at.desc())  # noqa: E711
+    else:
+        query = query.filter(or_(Event.starts_at == None, Event.starts_at > now)).order_by(Event.starts_at.asc().nullslast())  # noqa: E711
+
+    pagination = query.paginate(page=page, per_page=9, error_out=False)
+    return jsonify({
+        'items': [event_to_dict(e) for e in pagination.items],
+        'total': pagination.total,
+        'pages': pagination.pages,
+        'current_page': pagination.page,
+        'has_next': pagination.has_next,
+        'has_prev': pagination.has_prev,
+    })
+
+
+def _public_event_or_none(id):
+    event = db.session.get(Event, id)
+    return event if event and event.is_public else None
+
+
+@app.route('/api/events/<int:id>')
+def api_event(id):
+    event = _public_event_or_none(id)
+    if not event:
+        return jsonify({'error': 'Not found'}), 404
+    return jsonify(event_detail(event))
+
+
+@app.route('/api/events/<int:id>/register', methods=['POST'])
+@login_required
+@limiter.limit('20 per minute')
+def api_event_register(id):
+    event = _public_event_or_none(id)
+    if not event:
+        return jsonify({'error': 'Not found'}), 404
+
+    if EventRegistration.query.filter_by(event_id=event.id, user_id=current_user.id).first():
+        return jsonify(event_detail(event))
+    if event.has_started:
+        return jsonify({'error': 'This event has already started.'}), 400
+    if event.spots_left == 0:
+        return jsonify({'error': 'This event is full.'}), 400
+
+    db.session.add(EventRegistration(event_id=event.id, user_id=current_user.id))
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()  # a double tap: already registered
+    db.session.refresh(event)
+    return jsonify(event_detail(event)), 201
+
+
+@app.route('/api/events/<int:id>/unregister', methods=['POST'])
+@login_required
+def api_event_unregister(id):
+    event = _public_event_or_none(id)
+    if not event:
+        return jsonify({'error': 'Not found'}), 404
+    if event.has_started:
+        return jsonify({'error': 'This event has already started.'}), 400
+
+    registration = EventRegistration.query.filter_by(event_id=event.id, user_id=current_user.id).first()
+    if registration:
+        db.session.delete(registration)
+        db.session.commit()
+        db.session.refresh(event)
+    return jsonify(event_detail(event))
 
 
 @app.route('/api/news')
@@ -1427,41 +1864,40 @@ def api_news_detail(id):
     })
 
 
-@app.route('/api/blog')
-def api_blog():
-    search_query = request.args.get('search', '')
-    sort_by = request.args.get('sort', 'newest')
+def story_card(st):
+    plain = re.sub(r'\s+', ' ', st.content).strip()
+    return {
+        'id': st.id,
+        'slug': st.slug,
+        'title': st.title,
+        'excerpt': plain[:220] + ('…' if len(plain) > 220 else ''),
+        'author_name': st.author_name,
+        'author_info': st.author_info,
+        'program': st.program,
+        'avatar': st.avatar_path,
+        'cover_image': st.photos[0].path if st.photos else None,
+        'photo_count': len(st.photos),
+        'created_at': st.created_at.isoformat() if st.created_at else None,
+    }
+
+
+@app.route('/api/stories')
+def api_stories():
+    search_query = request.args.get('search', '').strip()
     page = request.args.get('page', 1, type=int)
-    per_page = 9
 
-    query = BlogPost.query.filter_by(is_published=True)
-
+    query = Story.query.filter_by(is_published=True)
     if search_query:
+        like = f'%{search_query}%'
         query = query.filter(
-            (BlogPost.title.ilike(f'%{search_query}%')) |
-            (BlogPost.content.ilike(f'%{search_query}%'))
+            Story.title.ilike(like) | Story.content.ilike(like) |
+            Story.author_name.ilike(like) | Story.program.ilike(like)
         )
 
-    if sort_by == 'alphabetical':
-        query = query.order_by(BlogPost.title.asc())
-    elif sort_by == 'oldest':
-        query = query.order_by(BlogPost.created_at.asc())
-    else:
-        query = query.order_by(BlogPost.created_at.desc())
-
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    pagination = query.order_by(Story.created_at.desc()).paginate(page=page, per_page=9, error_out=False)
 
     return jsonify({
-        'items': [{
-            'id': p.id,
-            'title': p.title,
-            'content': p.content,
-            'excerpt': p.excerpt,
-            'image_url': p.image_url,
-            'slug': p.slug,
-            'view_count': p.view_count or 0,
-            'created_at': p.created_at.isoformat() if p.created_at else None,
-        } for p in pagination.items],
+        'items': [story_card(st) for st in pagination.items],
         'total': pagination.total,
         'pages': pagination.pages,
         'current_page': pagination.page,
@@ -1470,41 +1906,34 @@ def api_blog():
     })
 
 
-@app.route('/api/blog/<string:slug>')
-def api_blog_post(slug):
-    p = BlogPost.query.filter_by(slug=slug, is_published=True).first_or_404()
+@app.route('/api/stories/<string:slug>')
+def api_story(slug):
+    st = Story.query.filter_by(slug=slug, is_published=True).first()
+    if not st:
+        return jsonify({'error': 'Not found'}), 404
 
-    p.view_count += 1
+    st.view_count = (st.view_count or 0) + 1
     db.session.commit()
 
-    related = BlogPost.query.filter(
-        BlogPost.id != p.id, BlogPost.is_published == True
-    ).order_by(BlogPost.created_at.desc()).limit(3).all()
+    related = Story.query.filter(
+        Story.id != st.id, Story.is_published == True  # noqa: E712
+    ).order_by(Story.created_at.desc()).limit(3).all()
 
     return jsonify({
-        'id': p.id,
-        'title': p.title,
-        'content': p.content,
-        'excerpt': p.excerpt,
-        'image_url': p.image_url,
-        'slug': p.slug,
-        'view_count': p.view_count,
-        'created_at': p.created_at.isoformat() if p.created_at else None,
-        'related': [{
-            'id': r.id,
-            'title': r.title,
-            'slug': r.slug,
-            'image_url': r.image_url,
-            'created_at': r.created_at.isoformat() if r.created_at else None,
-        } for r in related],
+        **story_card(st),
+        'content': st.content,
+        'photos': [p.path for p in st.photos],
+        'view_count': st.view_count,
+        'related': [story_card(r) for r in related],
     })
 
 
 @app.route('/api/contact', methods=['POST'])
+@limiter.limit('5 per minute')
 def api_contact():
-    raw_name = request.form.get('name', '')
-    raw_email = request.form.get('email', '')
-    raw_message = request.form.get('message', '')
+    raw_name = request.form.get('name', '')[:150]
+    raw_email = request.form.get('email', '')[:150]
+    raw_message = request.form.get('message', '')[:5000]
 
     if not all([raw_name, raw_email, raw_message]):
         return jsonify({'status': 'error', 'message': 'Please fill in all fields.'}), 400

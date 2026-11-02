@@ -55,8 +55,6 @@ const AboutSection = () => {
                   whileHover={{ y: -4, scale: 1.02 }}
                   className="relative bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-lg transition-all text-center overflow-hidden group"
                 >
-                  {/* Top color bar */}
-                  <div className="absolute top-0 left-0 right-0 h-1 transition-all group-hover:h-1.5" style={{ backgroundColor: item.bg }} />
                   <div
                     className="w-11 h-11 rounded-xl flex items-center justify-center mx-auto mb-3"
                     style={{ backgroundColor: `${item.bg}15`, color: item.bg }}
@@ -148,11 +146,6 @@ const AboutSection = () => {
                   whileHover={{ y: -4 }}
                   className="group relative p-7 rounded-2xl bg-white border border-slate-100 hover:shadow-xl transition-all duration-300 overflow-hidden"
                 >
-                  {/* Colored side stripe */}
-                  <div
-                    className="absolute top-0 left-0 w-1 h-full rounded-l-2xl"
-                    style={{ backgroundColor: obj.color }}
-                  />
                   <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 transition-all group-hover:scale-110"
                     style={{

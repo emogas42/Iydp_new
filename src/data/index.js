@@ -10,10 +10,11 @@ export const navItems = [
   {
     label: 'Projects',
     children: [
-      { label: 'Present Projects', href: '/opportunities' },
-      { label: 'Finished Projects', href: '/opportunities?status=finished' },
+      { label: 'Present Projects', href: '/projects' },
+      { label: 'Finished Projects', href: '/projects/finished' },
     ],
   },
+  { label: 'Events', href: '/events' },
   { label: 'Stories', href: '/stories' },
   { label: 'News', href: '/news' },
   { label: 'FAQ', href: '/faq' },
@@ -62,144 +63,6 @@ export const escFeatures = [
   { icon: 'Globe', title: 'Erasmus+ Partner', subtitle: 'Certified', color: '#6f3d90' },
   { icon: 'Users', title: 'Youth Exchanges', subtitle: 'EU & Beyond', color: '#7dba4e' },
   { icon: 'Award', title: 'Youthpass', subtitle: 'Recognized certificates', color: '#f06e60' },
-]
-
-// ─── Programs (mock data) ───────────────────────────────────
-export const programs = [
-  {
-    id: 1,
-    title: 'ESC Volunteering in Barcelona',
-    description: 'A 9-month volunteering placement in a youth center in Barcelona, working with local youth and refugees.',
-    type: 'ESC Volunteering',
-    location: 'Spain',
-    duration: '9 months',
-    participants: '1 volunteer',
-    funding: 'Fully funded',
-    status: 'Open',
-    image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=600',
-  },
-  {
-    id: 2,
-    title: 'Youth Exchange: Green Future',
-    description: 'A 10-day youth exchange in Tbilisi focusing on environmental sustainability and eco-activism.',
-    type: 'Youth Exchange',
-    location: 'Georgia',
-    duration: '10 days',
-    participants: '36 participants',
-    funding: 'Erasmus+ funded',
-    status: 'Open',
-    image: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&q=80&w=600',
-  },
-  {
-    id: 3,
-    title: 'Training Course: Digital Youth Work',
-    description: 'A 6-day training course for youth workers on using digital tools in non-formal education.',
-    type: 'Training Course',
-    location: 'Türkiye',
-    duration: '6 days',
-    participants: '25 participants',
-    funding: 'Erasmus+ funded',
-    status: 'Open',
-    image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=600',
-  },
-  {
-    id: 4,
-    title: 'Solidarity Project: Youth for Peace',
-    description: 'A local solidarity project in Baku promoting peace-building and intercultural dialogue.',
-    type: 'Solidarity Project',
-    location: 'Azerbaijan',
-    duration: '3 months',
-    participants: '12 participants',
-    funding: 'ESC funded',
-    status: 'Closing Soon',
-    image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=600',
-  },
-  {
-    id: 5,
-    title: 'ESC Volunteering in Krakow',
-    description: 'A 6-month volunteering project in Krakow working with children in an after-school program.',
-    type: 'ESC Volunteering',
-    location: 'Poland',
-    duration: '6 months',
-    participants: '2 volunteers',
-    funding: 'Fully funded',
-    status: 'Open',
-    image: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=600',
-  },
-  {
-    id: 6,
-    title: 'Capacity Building: Youth Inclusion',
-    description: 'A strategic partnership project aimed at enhancing youth organizations capacity for inclusive work.',
-    type: 'Capacity Building',
-    location: 'Italy',
-    duration: '12 months',
-    participants: '6 organizations',
-    funding: 'Erasmus+ funded',
-    status: 'Open',
-    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=600',
-  },
-]
-
-// ─── Stories (mock) ─────────────────────────────────────────
-export const stories = [
-  {
-    id: 1,
-    title: 'How ESC Changed My Perspective on Life',
-    excerpt: 'When I first arrived in Berlin for my ESC project, I felt completely out of my comfort zone. Nine months later, I returned home a different person.',
-    category: 'Volunteering',
-    author: 'Leyla Mammadova',
-    role: 'ESC Volunteer, Germany',
-    image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=600',
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?auto=format&fit=facearea&facepad=2&q=80&w=100',
-  },
-  {
-    id: 2,
-    title: 'Bridging Cultures Through Youth Exchange',
-    excerpt: 'The youth exchange in Portugal brought together 40 young people from 6 countries. We spent 10 incredible days exploring diversity.',
-    category: 'Youth Exchange',
-    author: 'Orkhan Aliyev',
-    role: 'Participant, Portugal',
-    image: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&q=80&w=600',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=facearea&facepad=2&q=80&w=100',
-  },
-  {
-    id: 3,
-    title: 'From Baku to Brussels: My Erasmus Journey',
-    excerpt: 'Participating in the training course in Brussels was a turning point in my career as a youth worker. The skills I gained are irreplaceable.',
-    category: 'Training',
-    author: 'Nigar Hasanova',
-    role: 'Youth Worker',
-    image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=600',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=facearea&facepad=2&q=80&w=100',
-  },
-]
-
-// ─── News (mock) ────────────────────────────────────────────
-export const newsItems = [
-  {
-    id: 1,
-    title: 'IYDP Opens Applications for ESC 2025',
-    date: '15 Jan 2025',
-    category: 'Programs',
-    excerpt: 'New volunteering placements available in 5 European countries for 2025.',
-    image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=600',
-  },
-  {
-    id: 2,
-    title: 'Youth Exchange Success in Georgia',
-    date: '08 Jan 2025',
-    category: 'Events',
-    excerpt: 'Our latest youth exchange brought together 36 young people from 6 countries.',
-    image: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&q=80&w=600',
-  },
-  {
-    id: 3,
-    title: 'Partnership with YEE Announced',
-    date: '01 Jan 2025',
-    category: 'Partnerships',
-    excerpt: 'IYDP and Youth and Environment Europe join forces for sustainability projects.',
-    image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=600',
-  },
 ]
 
 // ─── FAQ ─────────────────────────────────────────────────────
