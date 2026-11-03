@@ -64,6 +64,17 @@ const ApplySection = ({ project, onApplied }) => {
       </div>
     )
   }
+  if (project.requires_profile && !user.profile_complete) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-5 sm:p-7">
+        <p className="font-semibold text-slate-900">Complete your profile to apply</p>
+        <p className="mt-1 text-slate-600">This project asks for your education, languages and personal details. Your profile is {user.profile_progress}% filled.</p>
+        <Link to="/account/profile" state={{ from: `${location.pathname}?apply=1` }} className="mt-5 inline-flex h-12 items-center justify-center rounded-md bg-primary-600 px-6 font-semibold text-white transition-colors hover:bg-primary-700">
+          Complete profile
+        </Link>
+      </div>
+    )
+  }
   return <ApplicationForm projectId={project.id} user={user} onSubmitted={onApplied} />
 }
 

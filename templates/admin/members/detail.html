@@ -98,6 +98,73 @@
     </div>
 
     <div class="space-y-5 lg:col-span-3">
+        {% set p = member.profile %}
+        <section class="card overflow-hidden" aria-labelledby="profile-heading">
+            <div class="card-header">
+                <h2 id="profile-heading" class="card-title">Profile</h2>
+                {% if member.profile_complete %}<span class="badge badge-green">Complete</span>
+                {% else %}<span class="badge badge-amber">{{ member.profile_progress }}% filled</span>{% endif %}
+            </div>
+            {% if p %}
+            <dl class="divide-y divide-slate-100 text-sm">
+                {% for label, value in [
+                    ('Date of birth', p.birth_date.strftime('%d %b %Y') if p.birth_date else None),
+                    ('Gender', genders.get(p.gender)),
+                    ('Citizenship', p.citizenship),
+                    ('Lives in', p.residence),
+                    ('Occupation', occupations.get(p.occupation)),
+                ] if value %}
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">{{ label }}</dt>
+                    <dd class="min-w-0 break-words text-right font-medium">{{ value }}</dd>
+                </div>
+                {% endfor %}
+                {% if p.education %}
+                <div class="px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Education</dt>
+                    {% for e in p.education %}
+                    <dd class="mt-2 break-words"><span class="font-medium text-slate-900">{{ e.institution }}</span><span class="block text-xs text-slate-500">{{ education_levels.get(e.level) }}{% if e.field %} · {{ e.field }}{% endif %}{% if e.start_year %} · {{ e.start_year }}–{{ e.end_year or 'now' }}{% endif %}</span></dd>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if p.experience %}
+                <div class="px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Experience</dt>
+                    {% for e in p.experience %}
+                    <dd class="mt-2 break-words"><span class="font-medium text-slate-900">{{ e.organization }}</span><span class="block text-xs text-slate-500">{{ experience_kinds.get(e.kind) }}{% if e.role %} · {{ e.role }}{% endif %}{% if e.start_year %} · {{ e.start_year }}–{{ e.end_year or 'now' }}{% endif %}</span>{% if e.description %}<span class="mt-1 block whitespace-pre-line text-slate-600">{{ e.description }}</span>{% endif %}</dd>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if p.languages %}
+                <div class="flex items-start justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Languages</dt>
+                    <dd class="min-w-0 break-words text-right font-medium">{% for l in p.languages %}{{ l.language }} ({{ language_levels.get(l.level) }}){% if not loop.last %}, {% endif %}{% endfor %}</dd>
+                </div>
+                {% endif %}
+                {% if p.interests %}
+                <div class="flex items-start justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Interests</dt>
+                    <dd class="min-w-0 break-words text-right font-medium">{% for i in p.interests %}{{ interests.get(i, i) }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+                </div>
+                {% endif %}
+                {% for label, value in [('Skills', p.skills), ('Previous programmes', p.past_programmes), ('About', p.about)] if value %}
+                <div class="px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">{{ label }}</dt>
+                    <dd class="mt-1 whitespace-pre-line break-words text-slate-800">{{ value }}</dd>
+                </div>
+                {% endfor %}
+                {% for label, value in [('CV', p.cv_link), ('LinkedIn', p.linkedin)] if value %}
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">{{ label }}</dt>
+                    <dd class="min-w-0 truncate text-right"><a href="{{ value }}" target="_blank" rel="noopener noreferrer" class="link font-medium">{{ value }}</a></dd>
+                </div>
+                {% endfor %}
+            </dl>
+            {% else %}
+            <p class="px-4 py-8 text-center text-sm text-slate-500 sm:px-5">Not filled in yet.</p>
+            {% endif %}
+        </section>
+
         <section class="card overflow-hidden" aria-labelledby="payments-heading">
             <div class="card-header"><h2 id="payments-heading" class="card-title">Payments</h2></div>
             {% if payments %}

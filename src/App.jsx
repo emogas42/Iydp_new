@@ -22,6 +22,7 @@ const Erasmus = lazy(() => import('@/pages/Erasmus').then((m) => ({ default: m.E
 const Login = lazy(() => import('@/pages/Login').then((m) => ({ default: m.Login })))
 const Register = lazy(() => import('@/pages/Register').then((m) => ({ default: m.Register })))
 const Account = lazy(() => import('@/pages/Account').then((m) => ({ default: m.Account })))
+const Profile = lazy(() => import('@/pages/Profile').then((m) => ({ default: m.Profile })))
 const NotFound = lazy(() => import('@/pages/NotFound').then((m) => ({ default: m.NotFound })))
 
 const Loading = () => (
@@ -56,6 +57,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/account" element={<Account />} />
+              <Route path="/account/profile" element={<Profile />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

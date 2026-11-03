@@ -133,6 +133,26 @@ const Account = () => {
           </div>
 
           <div className="min-w-0 space-y-6 lg:col-span-2">
+            {user && (
+              <div className="rounded-lg border border-slate-200 bg-white p-6">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="text-sm font-semibold text-slate-900">Əlavə məlumatlar</h2>
+                  <span className="text-sm font-semibold tabular-nums text-primary-700">{user.profile_progress}%</span>
+                </div>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
+                  <div className="h-full bg-primary-600" style={{ width: `${user.profile_progress}%` }} />
+                </div>
+                <p className="mt-3 text-sm text-slate-600">
+                  {user.profile_complete
+                    ? 'Profiliniz tamamlanıb. İstədiyiniz vaxt yeniləyə bilərsiniz.'
+                    : 'Təhsil, təcrübə və dil biliklərinizi doldurun. Bəzi layihələrə müraciət üçün bu tələb olunur.'}
+                </p>
+                <Link to="/account/profile" className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-md bg-primary-600 text-sm font-semibold text-white transition-colors hover:bg-primary-700">
+                  {user.profile_complete ? 'Profilə bax' : 'Profili doldur'}
+                </Link>
+              </div>
+            )}
+
             <Panel title="Profil məlumatları">
               <dl className="space-y-3 text-sm">
                 {[['Email', user?.email], ['Telefon', user?.phone || '—'], ['Qeydiyyat', formatLongDate(user?.created_at) || '—']].map(([label, value]) => (

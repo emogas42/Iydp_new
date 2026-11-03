@@ -32,6 +32,8 @@ import qrcode.image.svg
 from models import (
     db, User, ContactMessage, Opportunity, OpportunityTag, OpportunityPhoto, Application,
     News, Story, StoryPhoto, Payment, Event, EventRegistration, Attendance,
+    MemberProfile, ProfileEducation, ProfileExperience, ProfileLanguage,
+    GENDERS, OCCUPATIONS, EDUCATION_LEVELS, EXPERIENCE_KINDS, LANGUAGE_LEVELS, INTERESTS,
     az_now_naive,
 )
 from services import vip as vip_service
@@ -299,6 +301,8 @@ def user_to_dict(u):
         'phone': u.phone,
         'is_admin': u.is_admin,
         'must_change_password': u.must_change_password,
+        'profile_progress': u.profile_progress,
+        'profile_complete': u.profile_complete,
         'is_vip': u.is_vip,
         'vip_status': u.vip_status,
         'card_type': u.card_type,
@@ -458,6 +462,158 @@ def api_change_password():
     # Other devices are signed out; keep this one signed in.
     login_user(current_user._get_current_object())
     return jsonify({'user': user_to_dict(current_user)})
+
+
+MAX_PROFILE_ROWS = 20
+LINK_RE = re.compile(r'^https?://\S+$')
+
+
+def _profile_to_dict(p):
+    return {
+        'birth_date': p.birth_date.isoformat() if p and p.birth_date else '',
+        'gender': (p and p.gender) or '',
+        'citizenship': (p and p.citizenship) or '',
+        'residence': (p and p.residence) or '',
+        'occupation': (p and p.occupation) or '',
+        'about': (p and p.about) or '',
+        'skills': (p and p.skills) or '',
+        'interests': (p and p.interests) or [],
+        'past_programmes': (p and p.past_programmes) or '',
+        'cv_link': (p and p.cv_link) or '',
+        'linkedin': (p and p.linkedin) or '',
+        'education': [{
+            'institution': e.institution, 'level': e.level, 'field': e.field or '',
+            'start_year': e.start_year or '', 'end_year': e.end_year or '',
+        } for e in (p.education if p else [])],
+        'experience': [{
+            'kind': e.kind, 'organization': e.organization, 'role': e.role or '',
+            'start_year': e.start_year or '', 'end_year': e.end_year or '', 'description': e.description or '',
+        } for e in (p.experience if p else [])],
+        'languages': [{'language': l.language, 'level': l.level} for l in (p.languages if p else [])],
+    }
+
+
+def _profile_rows(data, name, fields):
+    """Rows of one repeating section as clean strings. A row left fully blank is dropped."""
+    rows = data.get(name)
+    rows = rows if isinstance(rows, list) else []
+    clean = []
+    for row in rows[:MAX_PROFILE_ROWS]:
+        if isinstance(row, dict):
+            values = {f: str(row.get(f) or '').strip()[:limit] for f, limit in fields.items()}
+            if any(values.values()):
+                clean.append(values)
+    return clean
+
+
+def _profile_years(row, errors):
+    """Both years as ints or None. A bad value adds an error."""
+    years = []
+    for name in ('start_year', 'end_year'):
+        raw = row.get(name)
+        if not raw:
+            years.append(None)
+        elif raw.isdecimal() and 1950 <= int(raw) <= date.today().year + 10:
+            years.append(int(raw))
+        else:
+            errors.append(f'İl düzgün deyil: {raw}.')
+            years.append(None)
+    if years[0] and years[1] and years[1] < years[0]:
+        errors.append('Bitmə ili başlama ilindən əvvəl ola bilməz.')
+    return years
+
+
+@app.route('/api/account/profile')
+@login_required
+def api_get_profile():
+    return jsonify({
+        'profile': _profile_to_dict(current_user.profile),
+        'progress': current_user.profile_progress,
+        'complete': current_user.profile_complete,
+        'options': {
+            'genders': GENDERS, 'occupations': OCCUPATIONS, 'education_levels': EDUCATION_LEVELS,
+            'experience_kinds': EXPERIENCE_KINDS, 'language_levels': LANGUAGE_LEVELS, 'interests': INTERESTS,
+        },
+    })
+
+
+@app.route('/api/account/profile', methods=['POST'])
+@login_required
+@limiter.limit('30 per minute')
+def api_save_profile():
+    # Half-filled profiles can be saved: only what is entered gets checked.
+    data = request.get_json(silent=True) or {}
+    field = lambda name, limit: str(data.get(name) or '').strip()[:limit]  # noqa: E731
+    errors = []
+
+    raw_birth_date = field('birth_date', 10)
+    birth_date = _parse_date(raw_birth_date)
+    if raw_birth_date and (not birth_date or not date(1900, 1, 1) <= birth_date < date.today()):
+        errors.append('Doğum tarixi düzgün deyil.')
+    gender, occupation = field('gender', 20), field('occupation', 20)
+    if gender and gender not in GENDERS:
+        errors.append('Cinsiyyət seçimi düzgün deyil.')
+    if occupation and occupation not in OCCUPATIONS:
+        errors.append('Məşğuliyyət seçimi düzgün deyil.')
+    # Shown as links in the admin panel, so only http(s) is accepted.
+    cv_link, linkedin = field('cv_link', 500), field('linkedin', 500)
+    if (cv_link and not LINK_RE.match(cv_link)) or (linkedin and not LINK_RE.match(linkedin)):
+        errors.append('Linklər http:// və ya https:// ilə başlamalıdır.')
+    raw_interests = data.get('interests')
+    interests = [i for i in INTERESTS if isinstance(raw_interests, list) and i in raw_interests]
+
+    education = []
+    for row in _profile_rows(data, 'education', {'institution': 200, 'level': 20, 'field': 150, 'start_year': 4, 'end_year': 4}):
+        if not row['institution'] or row['level'] not in EDUCATION_LEVELS:
+            errors.append('Təhsil üçün müəssisə adını və səviyyəni daxil edin.')
+        start_year, end_year = _profile_years(row, errors)
+        education.append(ProfileEducation(
+            institution=row['institution'], level=row['level'], field=row['field'] or None,
+            start_year=start_year, end_year=end_year,
+        ))
+    experience = []
+    for row in _profile_rows(data, 'experience', {'kind': 20, 'organization': 200, 'role': 150, 'start_year': 4, 'end_year': 4, 'description': 2000}):
+        if not row['organization'] or row['kind'] not in EXPERIENCE_KINDS:
+            errors.append('Təcrübə üçün təşkilatın adını və növünü daxil edin.')
+        start_year, end_year = _profile_years(row, errors)
+        experience.append(ProfileExperience(
+            kind=row['kind'], organization=row['organization'], role=row['role'] or None,
+            start_year=start_year, end_year=end_year, description=row['description'] or None,
+        ))
+    languages = []
+    for row in _profile_rows(data, 'languages', {'language': 60, 'level': 10}):
+        if not row['language'] or row['level'] not in LANGUAGE_LEVELS:
+            errors.append('Dil üçün adını və səviyyəni daxil edin.')
+        languages.append(ProfileLanguage(language=row['language'], level=row['level']))
+    if errors:
+        return jsonify({'error': errors[0], 'errors': errors}), 400
+
+    profile = current_user.profile or MemberProfile(user_id=current_user.id)
+    profile.birth_date = birth_date
+    profile.gender = gender or None
+    profile.citizenship = field('citizenship', 100) or None
+    profile.residence = field('residence', 150) or None
+    profile.occupation = occupation or None
+    profile.about = field('about', 3000) or None
+    profile.skills = field('skills', 2000) or None
+    profile.interests = interests
+    profile.past_programmes = field('past_programmes', 2000) or None
+    profile.cv_link = cv_link or None
+    profile.linkedin = linkedin or None
+    profile.education = education
+    profile.experience = experience
+    profile.languages = languages
+    db.session.add(profile)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': 'Profil başqa pəncərədə saxlanılıb. Səhifəni yeniləyin.'}), 409
+    db.session.refresh(current_user)
+    return jsonify({
+        'profile': _profile_to_dict(current_user.profile),
+        'user': user_to_dict(current_user),
+    })
 
 
 @app.route('/api/vip/request', methods=['POST'])
@@ -660,6 +816,7 @@ def _apply_project_form(project, form, stale):
     mode = form.get('status_mode')
     project.status_mode = mode if mode in STATUS_MODES else 'auto'
     project.accepts_applications = 'accepts_applications' in form
+    project.requires_profile = 'requires_profile' in form
     project.is_active = 'is_active' in form
 
     wanted = {t.strip() for t in form.get('tags', '').split(',') if t.strip()}
@@ -1206,7 +1363,9 @@ def _render_member_detail(member, temp_password=None):
     )
     return render_template('admin/members/detail.html',
                          member=member, payments=payments, attendances=attendances,
-                         temp_password=temp_password)
+                         temp_password=temp_password,
+                         genders=GENDERS, occupations=OCCUPATIONS, education_levels=EDUCATION_LEVELS,
+                         experience_kinds=EXPERIENCE_KINDS, language_levels=LANGUAGE_LEVELS, interests=INTERESTS)
 
 
 @app.route('/admin/members/<int:id>/reset-password', methods=['POST'])
@@ -1557,6 +1716,7 @@ def project_to_dict(o):
         'deadline': o.deadline.isoformat() if o.deadline else None,
         'phase': o.phase,
         'accepts_applications': o.accepts_applications,
+        'requires_profile': o.requires_profile,
         'deadline_passed': o.deadline_passed,
         'applications_open': o.applications_open,
         'poster': project_cover(o),
@@ -1634,6 +1794,8 @@ def api_project_apply(id):
         return jsonify({'error': 'Not found'}), 404
     if not project.applications_open:
         return jsonify({'error': 'Applications for this project are closed.'}), 400
+    if project.requires_profile and not current_user.profile_complete:
+        return jsonify({'error': 'Please complete your profile before applying.'}), 403
 
     data = request.get_json(silent=True) or {}
     field = lambda name: str(data.get(name) or '').strip()  # noqa: E731

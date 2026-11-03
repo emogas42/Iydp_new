@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '@/utils/api'
 
 const MIN_MOTIVATION = 30
@@ -28,6 +28,23 @@ const ApplicationForm = ({ projectId, user, onSubmitted }) => {
   })
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // Saves retyping what the profile already has; anything typed meanwhile wins.
+  useEffect(() => {
+    let cancelled = false
+    api.getProfile()
+      .then(({ profile }) => {
+        if (cancelled) return
+        setForm((f) => ({
+          ...f,
+          birth_date: f.birth_date || profile.birth_date,
+          residence: f.residence || profile.residence,
+          cv_link: f.cv_link || profile.cv_link,
+        }))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const bind = (name) => ({
     id: `apply-${name}`,

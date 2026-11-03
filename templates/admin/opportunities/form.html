@@ -86,9 +86,13 @@
     {% endcall %}
 
     {% set accepts = (v.get('accepts_applications') if v else (project.accepts_applications if editing else True)) %}
+    {% set needs_profile = (v.get('requires_profile') if v else (project.requires_profile if editing else False)) %}
     {% set active = (v.get('is_active') if v else (project.is_active if editing else True)) %}
     {% call ui.section(5, 'Applications and visibility') %}
         {{ ui.toggle('accepts_applications', 'Accept applications', 'Shows the application form until the deadline. People need an account to apply.', checked=accepts) }}
+        <div class="border-t border-slate-100 pt-5">
+            {{ ui.toggle('requires_profile', 'Require a complete profile', 'People must fill in their education, languages and personal details before they can apply.', checked=needs_profile) }}
+        </div>
         <div class="border-t border-slate-100 pt-5">
             {{ ui.toggle('is_active', 'Show on website', 'Turn off to hide the project without deleting it.', checked=active) }}
         </div>

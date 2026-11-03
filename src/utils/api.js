@@ -24,6 +24,10 @@ async function post(url, body) {
 }
 
 export const api = {
+  // Member profile
+  getProfile: () => request(`${API}/account/profile`),
+  saveProfile: (form) => post(`${API}/account/profile`, form),
+
   // Homepage combined data
   getHome: () => request(`${API}/home`),
 

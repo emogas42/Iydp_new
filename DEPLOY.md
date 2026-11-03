@@ -1,15 +1,15 @@
 # Yükləmə təlimatı
 
-İki yol var: **cPanel** (öz hostinginiz) və ya **Render** (sürətli, canlı link üçün).
-Hər ikisi eyni `app.py`-ni işə salır — React tətbiqi (`src/`) build olunub Flask
-tərəfindən serve edilir, `/admin/*` isə ayrıca server-rendered admin paneldir.
+Sayt cPanel hostinqində işləyir. `app.py` Passenger ilə işə düşür, React tətbiqi (`src/`)
+build olunub Flask tərəfindən serve edilir, `/admin/*` isə ayrıca server-rendered admin paneldir.
+
+Hostinq planında **Setup Python App** olmalıdır: hər cPanel planında olmur. Python 3.10+ lazımdır.
 
 ---
 
-## A) cPanel
-
 ### 1. Faylları yükləyin
-Bu qovluğu (aşağıdakılar **istisna olmaqla**) cPanel-də tətbiqin kök qovluğuna yükləyin:
+Tətbiqi `public_html`-dən **kənarda** bir qovluğa qoyun (məs. `~/iydp`), əks halda `.env` və
+baza internetdən açıla bilər. Bu qovluğu (aşağıdakılar **istisna olmaqla**) ora yükləyin:
 `.venv/`, `venv/`, `node_modules/`, `__pycache__/`, `dist/`, `instance/*.db`
 (bunlar serverdə yenidən yaranacaq/build olunacaq).
 
@@ -66,37 +66,32 @@ cPanel → Setup Python App → "Restart" düyməsini basın ki, dəyişikliklə
 
 ---
 
-## B) Render.com (sürətli canlı link üçün)
+## Verilənlər bazası və ehtiyat nüsxə
 
-1. Kodu GitHub-a push edin.
-2. render.com → **New → Web Service** → repo-nu seçin.
-3. Ayarlar:
-   - **Runtime:** Python 3
-   - **Build Command:** `pip install -r requirements.txt && npm install && npm run build`
-   - **Start Command:** `gunicorn app:app --bind 0.0.0.0:$PORT` (bu `Procfile`-da
-     artıq yazılıb, Render onu avtomatik oxuyacaq — amma "Start Command" sahəsini əl ilə
-     dolduracaqsınızsa, mütləq `--bind 0.0.0.0:$PORT` hissəsini daxil edin, əks halda
-     Render tətbiqi "port tapılmadı" xətası ilə deploy-u uğursuz sayacaq)
-4. **Environment** bölməsində əlavə edin: `SECRET_KEY` (uzun təsadüfi sətir).
-5. Environment-ə `ADMIN_PASSWORD` də əlavə edin, deploy edin, sonra onu silin.
+Sayt SQLite ilə işləyir (`instance/iydp.db`), ayrıca baza serveri və ödəniş tələb etmir.
+Hər bağlantıda WAL rejimi, xarici açar yoxlaması və 15 saniyəlik gözləmə açılır.
 
-**Vacib məhdudiyyət:** Render-in pulsuz "Web Service" planında disk **müvəqqətidir** —
-hər redeploy/restart-da SQLite bazası sıfırlanır (bütün üzvlər, ödənişlər, iştirak
-qeydləri itir). Demo/sınaq üçün problem deyil, amma real istifadəçilər üçün **Render-in
-pulsuz PostgreSQL** əlavəsini qoşun:
-1. Render-də **New → PostgreSQL** yaradın (pulsuz tier var).
-2. Verdiyi "Internal Database URL"-i kopyalayın.
-3. Web Service-in Environment bölməsinə əlavə edin: `DATABASE_URL=<həmin URL>`.
-4. `requirements.txt`-ə `psycopg2-binary` əlavə edib yenidən deploy edin (bu paket
-   defolt olaraq daxil edilməyib, çünki bəzi Python versiyalarında əlavə build
-   addımı tələb edir).
+**WAL haqqında:** baza yanında `iydp.db-wal` və `iydp.db-shm` faylları görünə bilər, bu
+normaldır. Sayt işləyərkən `.db` faylını əl ilə kopyalamayın, son dəyişikliklər itə bilər.
+Hostinqin diski şəbəkə diski (NFS) olmamalıdır: hostinqdən soruşun.
 
-**Yüklənən şəkillər də eyni problemlə üzləşir.** Admin paneldən yüklənən bütün şəkillər
-(story, layihə posterləri və qalereyaları, tədbir posterləri) `static/uploads/` qovluğunda saxlanılır. Render-in
-pulsuz planında bu qovluq da hər redeploy-da silinir. Real istifadə üçün Render-də
-**Persistent Disk** qoşun və onu `static/uploads` yoluna bağlayın (və ya cPanel
-istifadə edin, orada fayllar qalıcıdır). Bu qovluq `.gitignore`-dadır, git-ə düşmür,
-ona görə serveri köçürəndə onu ayrıca kopyalayın.
+**Gündəlik ehtiyat nüsxə:** cPanel → **Cron Jobs** → gündə bir dəfə. Virtual mühitin yolunu
+Setup Python App səhifəsi göstərir:
+```bash
+cd ~/iydp && ~/virtualenv/iydp/3.11/bin/python scripts/backup_db.py
+```
+Skript bazanı və yeni şəkilləri `../iydp-backups` qovluğuna yazır, bazanın 14 gündən köhnə
+nüsxələrini silir. Cron üçün email ünvanı qoyun ki, xəta olanda xəbər tutasınız.
+
+**Vacib:** bu nüsxələr eyni serverdədir. Hostinq hesabı itsə, onlar da itər. Həftədə bir dəfə
+ən son nüsxəni serverdən kənara endirin və kənar nüsxəni şifrəli yerdə saxlayın, içində üzv
+məlumatları var.
+
+**Bərpa:**
+1. Setup Python App → **Stop**.
+2. `gunzip -c ../iydp-backups/iydp-TARİX.db.gz > instance/iydp.db`
+3. `rm -f instance/iydp.db-wal instance/iydp.db-shm`
+4. Setup Python App → **Start**.
 
 ---
 
@@ -104,7 +99,7 @@ ona görə serveri köçürəndə onu ayrıca kopyalayın.
 
 - [ ] `SECRET_KEY`-i `.env`/hosting environment-də təyin edin (yuxarıya baxın).
 - [ ] `ADMIN_PASSWORD`-u uzun seçin, ilk girişdən sonra environment-dən silin.
-- [ ] HTTPS-i aktivləşdirin (cPanel: AutoSSL; Render: avtomatik).
+- [ ] HTTPS-i aktivləşdirin (cPanel: AutoSSL).
 - [ ] `SESSION_COOKIE_SECURE=1` qalsın (default belədir) — bu, sessiya cookie-sinin
       yalnız HTTPS üzərində göndərilməsini təmin edir. Yalnız lokal HTTP test üçün 0 edin.
 - [ ] `FLASK_DEBUG` heç vaxt production-da `1` olmasın (default `0`-dır, dəyişməyin).
@@ -113,9 +108,9 @@ Artıq kodda hazır olan qorunma: CSRF token (bütün formalarda və API sorğul
 login/qeydiyyat üçün rate-limit (brute-force qorunması), parolların hash-lənməsi,
 sessiya cookie-lərinin HttpOnly+SameSite ilə qorunması.
 
-**Qeyd:** Rate-limit hazırda proses-daxili yaddaşda saxlanılır (Flask-Limiter). Əgər
-gələcəkdə gunicorn-u bir neçə worker (`--workers N`) ilə işə salsanız, limit effektiv
-olaraq N dəfə artmış olar (hər worker öz sayğacını saxlayır). Kiçik/orta trafik üçün bu
+**Qeyd:** Rate-limit hazırda proses-daxili yaddaşda saxlanılır (Flask-Limiter). Passenger
+bir neçə proses işlədirsə, limit effektiv olaraq o qədər dəfə artmış olar (hər proses öz
+sayğacını saxlayır). Kiçik/orta trafik üçün bu
 qəbul edilə bilər; böyük tətbiq üçün Redis-based storage (`Limiter(storage_uri=...)`)
 əlavə edilməlidir.
 
@@ -134,6 +129,10 @@ qəbul edilə bilər; böyük tətbiq üçün Redis-based storage (`Limiter(stor
   kart), `/faq`, `/stories` (+ `/stories/:slug`), `/erasmus`. Bu səhifələr real `/api/*` endpoint-lərindən
   (admin panel-dən idarə olunan) data çəkir. `npm run build` ilə `dist/`-ə yığılır,
   Flask onu serve edir.
+
+**Üzv profili:** `/account/profile` səhifəsində üzv təhsil, təcrübə, dil və digər
+məlumatlarını doldurur. Admin onları üzvün səhifəsində görür. Layihə formasında
+**Require a complete profile** açıqdırsa, profil tamamlanmadan müraciət etmək olmur.
 
 **Stories:** iştirakçıların Erasmus+/ESC təcrübələri admin paneldə **Stories**
 bölməsindən idarə olunur (başlıq, profil fotosu, ad, qısa məlumat, mətn, layihə

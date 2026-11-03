@@ -1,16 +1,53 @@
 import secrets
+import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
+from sqlalchemy import event as sa_event
+from sqlalchemy.engine import Engine
 
 db = SQLAlchemy()
+
+
+@sa_event.listens_for(Engine, 'connect')
+def configure_sqlite(connection, _record):
+    if isinstance(connection, sqlite3.Connection):
+        cursor = connection.cursor()
+        # Readers no longer block the writer, and writes get much faster.
+        cursor.execute('PRAGMA journal_mode=WAL')
+        # SQLite leaves foreign keys unchecked unless asked, per connection.
+        cursor.execute('PRAGMA foreign_keys=ON')
+        # Writers queue instead of failing when a popular event opens.
+        cursor.execute('PRAGMA busy_timeout=15000')
+        cursor.close()
 
 
 AZ_TZ = timezone(timedelta(hours=4))
 
 # Membership card types shown on the account page and at the QR scanner.
 CARD_LABELS = {'standard': 'Standard', 'vip': 'VIP', 'member': 'Member'}
+
+# Choices on the member profile page. The API serves these to the form, so this is the only list.
+GENDERS = {'female': 'Qadın', 'male': 'Kişi', 'other': 'Digər', 'undisclosed': 'Bildirmək istəmirəm'}
+OCCUPATIONS = {
+    'school_student': 'Şagird', 'student': 'Tələbə', 'employed': 'İşləyir',
+    'self_employed': 'Özünüməşğul', 'unemployed': 'İş axtarır', 'other': 'Digər',
+}
+EDUCATION_LEVELS = {
+    'secondary': 'Orta təhsil', 'vocational': 'Peşə təhsili', 'bachelor': 'Bakalavr',
+    'master': 'Magistr', 'phd': 'Doktorantura', 'other': 'Digər',
+}
+EXPERIENCE_KINDS = {'work': 'İş', 'volunteer': 'Könüllülük', 'internship': 'Təcrübə proqramı', 'project': 'Layihə'}
+LANGUAGE_LEVELS = {
+    'A1': 'A1', 'A2': 'A2', 'B1': 'B1', 'B2': 'B2', 'C1': 'C1', 'C2': 'C2', 'native': 'Ana dili',
+}
+INTERESTS = {
+    'youth_work': 'Gənclər işi', 'environment': 'Ekologiya və iqlim', 'education': 'Təhsil',
+    'human_rights': 'İnsan hüquqları', 'inclusion': 'İnklüzivlik', 'digital': 'Rəqəmsal bacarıqlar',
+    'culture': 'Mədəniyyət və incəsənət', 'entrepreneurship': 'Sahibkarlıq',
+    'health_sport': 'Sağlamlıq və idman', 'media': 'Media və kommunikasiya',
+}
 
 
 def utcnow():
@@ -59,6 +96,7 @@ class User(UserMixin, db.Model):
     )
     applications = db.relationship('Application', backref='user', lazy=True, cascade='all, delete-orphan')
     event_registrations = db.relationship('EventRegistration', backref='user', lazy=True, cascade='all, delete-orphan')
+    profile = db.relationship('MemberProfile', backref='user', uselist=False, cascade='all, delete-orphan')
 
     def get_id(self):
         return f'{self.id}.{self.session_version}'
@@ -98,6 +136,79 @@ class User(UserMixin, db.Model):
     def display_name(self):
         return self.full_name or self.username
 
+    @property
+    def profile_progress(self):
+        """Filled share of what a project can require, 0 to 100."""
+        checks = self.profile.required_checks() if self.profile else []
+        return round(100 * sum(checks) / MemberProfile.REQUIRED_COUNT)
+
+    @property
+    def profile_complete(self):
+        return self.profile_progress == 100
+
+
+class MemberProfile(db.Model):
+    REQUIRED_COUNT = 6
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=False)
+    birth_date = db.Column(db.Date, nullable=True)
+    gender = db.Column(db.String(20), nullable=True)
+    citizenship = db.Column(db.String(100), nullable=True)
+    residence = db.Column(db.String(150), nullable=True)
+    occupation = db.Column(db.String(20), nullable=True)
+    about = db.Column(db.Text, nullable=True)
+    skills = db.Column(db.Text, nullable=True)
+    interests = db.Column(db.JSON, nullable=True)
+    past_programmes = db.Column(db.Text, nullable=True)
+    cv_link = db.Column(db.String(500), nullable=True)
+    linkedin = db.Column(db.String(500), nullable=True)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
+
+    education = db.relationship(
+        'ProfileEducation', lazy=True, order_by='ProfileEducation.id', cascade='all, delete-orphan'
+    )
+    experience = db.relationship(
+        'ProfileExperience', lazy=True, order_by='ProfileExperience.id', cascade='all, delete-orphan'
+    )
+    languages = db.relationship(
+        'ProfileLanguage', lazy=True, order_by='ProfileLanguage.id', cascade='all, delete-orphan'
+    )
+
+    def required_checks(self):
+        return [
+            bool(self.birth_date), bool(self.citizenship), bool(self.residence),
+            bool(self.occupation), bool(self.education), bool(self.languages),
+        ]
+
+
+class ProfileEducation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    profile_id = db.Column(db.Integer, db.ForeignKey('member_profile.id'), nullable=False, index=True)
+    institution = db.Column(db.String(200), nullable=False)
+    level = db.Column(db.String(20), nullable=False)
+    field = db.Column(db.String(150), nullable=True)
+    start_year = db.Column(db.Integer, nullable=True)
+    end_year = db.Column(db.Integer, nullable=True)  # empty: still studying
+
+
+class ProfileExperience(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    profile_id = db.Column(db.Integer, db.ForeignKey('member_profile.id'), nullable=False, index=True)
+    kind = db.Column(db.String(20), nullable=False)
+    organization = db.Column(db.String(200), nullable=False)
+    role = db.Column(db.String(150), nullable=True)
+    start_year = db.Column(db.Integer, nullable=True)
+    end_year = db.Column(db.Integer, nullable=True)  # empty: still there
+    description = db.Column(db.Text, nullable=True)
+
+
+class ProfileLanguage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    profile_id = db.Column(db.Integer, db.ForeignKey('member_profile.id'), nullable=False, index=True)
+    language = db.Column(db.String(60), nullable=False)
+    level = db.Column(db.String(10), nullable=False)
+
 
 class ContactMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -122,6 +233,8 @@ class Opportunity(db.Model):
     # auto: finished once end_date has passed. present/finished: set by an admin.
     status_mode = db.Column(db.String(10), default='auto', nullable=False)
     accepts_applications = db.Column(db.Boolean, default=True, nullable=False)
+    # Applicants must finish their member profile first.
+    requires_profile = db.Column(db.Boolean, default=False, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     view_count = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

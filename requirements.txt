@@ -8,9 +8,6 @@ Werkzeug==3.1.9
 python-dotenv==1.2.2
 qrcode==7.4.2
 Pillow==13.0.0
-gunicorn==22.0.0
 
-# If you switch DATABASE_URL to PostgreSQL (recommended for production —
-# see DEPLOY.md), also run: pip install psycopg2-binary
-# Not included by default since it needs a prebuilt wheel for your Python
-# version and isn't required for the default SQLite setup.
+# The site runs on SQLite. If DATABASE_URL ever moves to MySQL, also install
+# PyMySQL; for PostgreSQL, psycopg2-binary.

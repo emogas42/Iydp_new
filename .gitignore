@@ -15,6 +15,7 @@ instance/*.db
 instance/*.db-journal
 instance/*.db-wal
 instance/*.db-shm
+*.db.gz
 *.pem
 *.key
 *.log
