@@ -1,5 +1,5 @@
 """Event check-in logic used by the admin QR scanner page."""
-from models import db, User, Attendance
+from models import db, User, Attendance, EventRegistration
 
 QR_PREFIX = 'IYDPVIP:'
 
@@ -15,8 +15,12 @@ def decode_qr_value(raw_code):
     return raw_code
 
 
-def check_in(event, raw_code, admin_user):
-    """Returns (status, payload) where status is one of: 'ok', 'duplicate', 'invalid'."""
+def check_in(event, raw_code, admin_user, override=False):
+    """Returns (status, payload) where status is one of: 'ok', 'duplicate', 'invalid', 'not_approved'.
+
+    An event with a registration form admits approved applicants. The person at the
+    door can still let someone else in with override. Without a form, anyone can walk in.
+    """
     token = decode_qr_value(raw_code)
     if not token:
         return 'invalid', None
@@ -28,6 +32,11 @@ def check_in(event, raw_code, admin_user):
     existing = Attendance.query.filter_by(event_id=event.id, user_id=member.id).first()
     if existing:
         return 'duplicate', existing
+
+    if event.has_form and not override:
+        registration = EventRegistration.query.filter_by(event_id=event.id, user_id=member.id).first()
+        if not registration or registration.status != 'approved':
+            return 'not_approved', (member, registration)
 
     attendance = Attendance(
         event_id=event.id,

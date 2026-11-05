@@ -52,9 +52,9 @@ const Projects = ({ phase = 'present' }) => {
           <motion.nav aria-label="Breadcrumb" {...fadeUp(0)}>
             <ol className="flex items-center justify-center gap-1.5 text-sm">
               <li><Link to="/" className="text-slate-500 transition-colors hover:text-primary-600">Home</Link></li>
-              <li aria-hidden="true" className="text-slate-400">/</li>
+              <li aria-hidden="true" className="text-slate-500">/</li>
               <li className="text-slate-500">Projects</li>
-              <li aria-hidden="true" className="text-slate-400">/</li>
+              <li aria-hidden="true" className="text-slate-500">/</li>
               <li aria-current="page" className="text-slate-800">{copy.crumb}</li>
             </ol>
           </motion.nav>
@@ -82,21 +82,21 @@ const Projects = ({ phase = 'present' }) => {
         <Container>
           <motion.div {...fadeUp(0.2)} className="relative mx-auto max-w-2xl">
             <label htmlFor="project-search" className="sr-only">Search projects</label>
-            <Search className="pointer-events-none absolute left-5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-500" />
             <input
               id="project-search"
               type="search"
               placeholder="Search by name or location"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white py-4 pl-[52px] pr-12 text-base text-slate-800 placeholder:text-slate-400 transition focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 [&::-webkit-search-cancel-button]:hidden"
+              className="w-full rounded-lg border border-slate-200 bg-white py-4 pl-[52px] pr-12 text-base text-slate-800 placeholder:text-slate-500 transition focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 [&::-webkit-search-cancel-button]:hidden"
             />
             {search && (
               <button
                 type="button"
                 aria-label="Clear search"
                 onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700"
               >
                 <X className="h-4 w-4" />
               </button>

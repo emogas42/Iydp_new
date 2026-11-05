@@ -8,7 +8,12 @@
 {% block content %}
 {% call ui.page_header('Edit event' if editing else 'New event', 'Shown on the Events page; members register and check in with their QR card',
                        back=url_for('event_attendance', id=event.id) if editing else url_for('list_events'),
-                       back_label=event.name|truncate(32) if editing else 'Events', icon_name='calendar-days', color='text-ired') %}{% endcall %}
+                       back_label=event.name|truncate(32) if editing else 'Events', icon_name='calendar-days', color='text-ired') %}
+    {% if editing %}
+    <a href="{{ url_for('event_attendance', id=event.id) }}" class="btn btn-secondary">{{ ui.icon('users') }} Registered people ({{ event.registrations|length }})</a>
+    <a href="{{ url_for('event_form', id=event.id) }}" class="btn btn-secondary">{{ ui.icon('clipboard-list') }} {{ 'Form' if event.has_form else 'Create form' }}</a>
+    {% endif %}
+{% endcall %}
 
 <form method="POST" enctype="multipart/form-data" action="{{ url_for('edit_event', id=event.id) if editing else url_for('add_event') }}" class="space-y-5" data-busy>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

@@ -33,6 +33,10 @@
                 {% else %}<span class="badge badge-green">Present</span>{% endif %}
                 {{ ui.icon('chevron-right', 'h-3.5 w-3.5 text-slate-300') }}
             </a>
+            {{ ui.row_actions([
+                (url_for('list_applications', project=o.id), 'users', 'Applications (' ~ o.applications|length ~ ')'),
+                (url_for('project_form', id=o.id), 'clipboard-list', 'Form' if o.has_form else 'Create form'),
+            ]) }}
         </li>
         {% endfor %}
     </ul>

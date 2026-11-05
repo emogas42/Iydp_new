@@ -9,7 +9,8 @@
 {% block content %}
 {% call ui.page_header('Edit project' if editing else 'New project', 'Shown under Present or Finished Projects on the website', back=url_for('list_opportunities'), back_label='Projects', icon_name='briefcase', color='text-ired') %}
     {% if editing %}
-    <a href="{{ url_for('list_applications', project=project.id) }}" class="btn btn-secondary">{{ ui.icon('clipboard-list') }} Applications ({{ project.applications|length }})</a>
+    <a href="{{ url_for('list_applications', project=project.id) }}" class="btn btn-secondary">{{ ui.icon('users') }} Applications ({{ project.applications|length }})</a>
+    <a href="{{ url_for('project_form', id=project.id) }}" class="btn btn-secondary">{{ ui.icon('clipboard-list') }} {{ 'Form' if project.has_form else 'Create form' }}</a>
     {% if project.is_active %}
     <a href="/projects/{{ project.id }}" target="_blank" rel="noopener" class="btn btn-secondary">{{ ui.icon('external-link') }} View on site</a>
     {% endif %}

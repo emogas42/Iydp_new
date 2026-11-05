@@ -23,7 +23,7 @@ const Footer = () => {
               <input
                 type="email"
                 placeholder="Your email address"
-                className="flex-1 bg-white border border-slate-200 rounded-l-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-500 transition"
+                className="flex-1 bg-white border border-slate-200 rounded-l-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:border-primary-500 transition"
               />
               <button className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-r-xl text-sm font-semibold transition-all flex items-center gap-2">
                 Subscribe <ArrowRight className="w-3.5 h-3.5" />
@@ -130,7 +130,7 @@ const Footer = () => {
       {/* Bottom bar */}
       <div className="border-t border-slate-200">
         <div className="max-w-7xl mx-auto px-5 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-slate-400 text-xs">
+          <p className="text-slate-500 text-xs">
             © {new Date().getFullYear()} International Youth Dialogue Platform.
             All rights reserved.
           </p>

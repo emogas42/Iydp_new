@@ -1,0 +1,175 @@
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% block title %}Application form{% endblock %}
+
+{% block content %}
+{% call ui.page_header('Application form', owner_name, back=back_url, back_label=back_label, icon_name='clipboard-list', color='text-ired') %}
+    {% if view_url %}
+    <a href="{{ view_url }}" target="_blank" rel="noopener" class="btn btn-secondary">{{ ui.icon('external-link') }} View on site</a>
+    {% endif %}
+{% endcall %}
+
+<p class="mb-4 text-sm text-slate-600">People fill this in to apply, and you approve or reject each one. Name, email and phone come from their account, so there is no need to ask for them.{% if has_responses %} Changes here do not affect answers already received.{% endif %}</p>
+
+{% if not questions %}
+<p class="card mb-4 px-4 py-3 text-sm font-medium text-ink">{{ empty_note }}</p>
+{% endif %}
+
+<form method="POST" id="builder-form" data-busy>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="questions_json" id="questions-json">
+    <ol id="question-list" class="space-y-4"></ol>
+    <button type="button" id="add-question" class="btn btn-secondary mt-4 w-full">{{ ui.icon('plus') }} Add question</button>
+    {{ ui.form_actions('Save form', back_url) }}
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script type="application/json" id="initial-questions">{{ questions|tojson }}</script>
+<script type="application/json" id="question-kinds">{{ kinds|tojson }}</script>
+<script>
+(function () {
+    var list = document.getElementById('question-list');
+    var kinds = JSON.parse(document.getElementById('question-kinds').textContent);
+    var CHOICE = ['single', 'multiple', 'dropdown'];
+    var ICONS = {
+        up: {{ ui.icon('arrow-up')|string|tojson }},
+        down: {{ ui.icon('arrow-down')|string|tojson }},
+        remove: {{ ui.icon('trash-2')|string|tojson }},
+        x: {{ ui.icon('x')|string|tojson }},
+        plus: {{ ui.icon('plus')|string|tojson }}
+    };
+
+    // Everything typed goes in through .value or .textContent, never as HTML.
+    function el(tag, className, text) {
+        var node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text) node.textContent = text;
+        return node;
+    }
+
+    function iconButton(icon, label, onClick) {
+        var b = el('button', 'btn btn-ghost h-11 w-11 p-0');
+        b.type = 'button';
+        b.setAttribute('aria-label', label);
+        b.innerHTML = icon;
+        b.addEventListener('click', onClick);
+        return b;
+    }
+
+    function field(labelText, control) {
+        var wrap = el('label', 'block');
+        wrap.appendChild(el('span', 'label', labelText));
+        wrap.appendChild(control);
+        return wrap;
+    }
+
+    function addOption(box, value) {
+        var row = el('div', 'option-row flex items-center gap-2');
+        var input = el('input', 'input option-input');
+        input.maxLength = 200;
+        input.value = value || '';
+        input.setAttribute('aria-label', 'Option');
+        input.placeholder = 'Option';
+        row.appendChild(input);
+        row.appendChild(iconButton(ICONS.x, 'Remove option', function () { row.remove(); }));
+        box.appendChild(row);
+        return input;
+    }
+
+    function renumber() {
+        Array.prototype.forEach.call(list.children, function (card, i) {
+            card.querySelector('.q-number').textContent = 'Question ' + (i + 1);
+        });
+    }
+
+    function addQuestion(q, focus) {
+        q = q || { kind: 'short', required: true };
+        var card = el('li', 'card space-y-4 p-4 sm:p-5');
+        if (Number.isInteger(q.id)) card.dataset.id = q.id;
+
+        var head = el('div', 'flex items-center gap-1');
+        head.appendChild(el('p', 'q-number flex-1 text-xs font-semibold uppercase tracking-wide text-ipurple'));
+        head.appendChild(iconButton(ICONS.up, 'Move up', function () {
+            if (card.previousElementSibling) { list.insertBefore(card, card.previousElementSibling); renumber(); }
+        }));
+        head.appendChild(iconButton(ICONS.down, 'Move down', function () {
+            if (card.nextElementSibling) { list.insertBefore(card.nextElementSibling, card); renumber(); }
+        }));
+        head.appendChild(iconButton(ICONS.remove, 'Delete question', function () {
+            if (confirm('Delete this question?')) { card.remove(); renumber(); }
+        }));
+        card.appendChild(head);
+
+        var label = el('input', 'input q-label');
+        label.maxLength = 300;
+        label.value = q.label || '';
+        card.appendChild(field('Question', label));
+
+        var help = el('input', 'input q-help');
+        help.maxLength = 500;
+        help.value = q.help_text || '';
+        help.placeholder = 'Optional';
+        card.appendChild(field('Explanation', help));
+
+        var kind = el('select', 'input q-kind');
+        Object.keys(kinds).forEach(function (key) {
+            var o = el('option', '', kinds[key]);
+            o.value = key;
+            kind.appendChild(o);
+        });
+        kind.value = q.kind in kinds ? q.kind : 'short';
+        card.appendChild(field('Answer type', kind));
+
+        var optionsWrap = el('div', 'space-y-2');
+        optionsWrap.appendChild(el('p', 'label', 'Options'));
+        var optionsBox = el('div', 'q-options space-y-2');
+        optionsWrap.appendChild(optionsBox);
+        var addOpt = el('button', 'btn btn-secondary w-full sm:w-auto');
+        addOpt.type = 'button';
+        addOpt.innerHTML = ICONS.plus + ' Add option';
+        addOpt.addEventListener('click', function () { addOption(optionsBox).focus(); });
+        optionsWrap.appendChild(addOpt);
+        card.appendChild(optionsWrap);
+        (Array.isArray(q.options) ? q.options : []).forEach(function (o) { addOption(optionsBox, o); });
+
+        function syncKind() {
+            var isChoice = CHOICE.indexOf(kind.value) !== -1;
+            optionsWrap.classList.toggle('hidden', !isChoice);
+            if (isChoice && !optionsBox.children.length) { addOption(optionsBox); addOption(optionsBox); }
+        }
+        kind.addEventListener('change', syncKind);
+        syncKind();
+
+        var required = el('label', 'flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-slate-800');
+        var box = el('input', 'q-required h-5 w-5 shrink-0 rounded border-slate-300');
+        box.type = 'checkbox';
+        box.checked = q.required === true;
+        required.appendChild(box);
+        required.appendChild(document.createTextNode('Required'));
+        card.appendChild(required);
+
+        list.appendChild(card);
+        renumber();
+        if (focus) label.focus();
+    }
+
+    JSON.parse(document.getElementById('initial-questions').textContent).forEach(function (q) { addQuestion(q); });
+    document.getElementById('add-question').addEventListener('click', function () { addQuestion(null, true); });
+
+    document.getElementById('builder-form').addEventListener('submit', function () {
+        var out = Array.prototype.map.call(list.children, function (card) {
+            return {
+                id: card.dataset.id ? parseInt(card.dataset.id, 10) : null,
+                label: card.querySelector('.q-label').value,
+                help_text: card.querySelector('.q-help').value,
+                kind: card.querySelector('.q-kind').value,
+                required: card.querySelector('.q-required').checked,
+                options: Array.prototype.map.call(card.querySelectorAll('.option-input'), function (i) { return i.value; })
+            };
+        });
+        document.getElementById('questions-json').value = JSON.stringify(out);
+    });
+})();
+</script>
+{% endblock %}

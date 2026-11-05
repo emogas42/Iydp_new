@@ -1,0 +1,92 @@
+{% extends 'admin/layout.html' %}
+{% import 'admin/_ui.html' as ui with context %}
+{% block title %}Application{% endblock %}
+
+{% block content %}
+{% set r = registration %}
+{% set full = event.spots_left == 0 and r.status != 'approved' %}
+{% call ui.page_header(r.user.display_name, event.name, back=url_for('event_attendance', id=event.id, status='pending' if event.pending_count else None), back_label='Applications', icon_name='clipboard-list', color='text-ired') %}{% endcall %}
+
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-5 [&>*]:min-w-0">
+    <div class="space-y-5 lg:col-span-3">
+        <section class="card" aria-labelledby="answers-heading">
+            <div class="card-header"><h2 id="answers-heading" class="card-title">Answers</h2></div>
+            {% if r.answers %}
+            <dl class="divide-y divide-slate-100">
+                {% for a in r.answers %}
+                <div class="px-4 py-3.5 sm:px-5">
+                    <dt class="text-sm text-slate-500">{{ a.label }}</dt>
+                    <dd class="mt-1 whitespace-pre-line break-words text-[15px] text-ink">{% if a.value is string %}{{ a.value or '—' }}{% else %}{{ a.value|join(', ') or '—' }}{% endif %}</dd>
+                </div>
+                {% endfor %}
+            </dl>
+            {% else %}
+            <p class="px-4 py-8 text-center text-sm text-slate-500 sm:px-5">Registered before forms were added, so there are no answers.</p>
+            {% endif %}
+        </section>
+
+        <section class="card" aria-labelledby="person-heading">
+            <div class="card-header"><h2 id="person-heading" class="card-title">Applicant</h2></div>
+            <dl class="divide-y divide-slate-100 text-sm">
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Email</dt>
+                    <dd class="min-w-0 truncate text-right">{% if r.user.email %}<a href="mailto:{{ r.user.email }}" class="link">{{ r.user.email }}</a>{% else %}—{% endif %}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Phone</dt>
+                    <dd class="text-right">{% if r.user.phone %}<a href="tel:{{ r.user.phone|replace(' ', '') }}" class="link">{{ r.user.phone }}</a>{% else %}—{% endif %}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Card</dt>
+                    <dd class="text-right font-medium">{{ r.user.card_label }}{% if r.user.membership_no %} · {{ r.user.membership_no }}{% endif %}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Applied</dt>
+                    <dd class="text-right font-medium">{{ r.created_at|az_time if r.created_at else '—' }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Profile</dt>
+                    <dd class="text-right"><a href="{{ url_for('view_member', id=r.user_id) }}" class="link">Open full profile ({{ r.user.profile_progress }}%)</a></dd>
+                </div>
+            </dl>
+        </section>
+    </div>
+
+    <section class="card h-fit lg:col-span-2" aria-labelledby="decision-heading">
+        <div class="card-header">
+            <h2 id="decision-heading" class="card-title">Decision</h2>
+            {{ ui.registration_badge(r.status) }}
+        </div>
+        <div class="space-y-4 p-4 sm:p-5">
+            {% if r.decided_at %}
+            <p class="text-sm text-slate-600">
+                {{ 'Approved' if r.status == 'approved' else 'Rejected' }} on {{ r.decided_at|az_time }}{% if r.decided_by %} by {{ r.decided_by.display_name }}{% endif %}.
+                {% if r.email_status == 'sent' %}The member was told by email and on their account page.
+                {% elif r.email_status == 'failed' %}<strong class="font-semibold text-ired-dark">The email could not be sent.</strong> They can still see it on their account page.
+                {% else %}They can see it on their account page. No email was sent.{% endif %}
+            </p>
+            {% endif %}
+            {% if event.capacity %}<p class="text-sm text-slate-600">Seats left: <strong class="font-semibold text-ink">{{ event.spots_left }} of {{ event.capacity }}</strong></p>{% endif %}
+            {% if full %}<p class="text-sm font-medium text-ired-dark">All seats are taken. Raise the seat limit or free a seat before approving.</p>{% endif %}
+
+            {# No data-busy here: it disables the buttons, and a disabled button sends no decision. #}
+            <form method="POST" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div>
+                    <label for="note" class="label">Message to the applicant <span class="optional">Optional</span></label>
+                    <textarea id="note" name="note" rows="3" maxlength="1000" class="input resize-y">{{ r.decision_note or '' }}</textarea>
+                    <p class="hint">Goes out with the decision.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    {% if r.status != 'approved' %}
+                    <button type="submit" name="decision" value="approved" class="btn btn-success {{ 'col-span-2' if r.status == 'rejected' }}" {{ 'disabled' if full }} onclick="return confirm('Approve this application? The member will be told.');">{{ ui.icon('check') }} Approve</button>
+                    {% endif %}
+                    {% if r.status != 'rejected' %}
+                    <button type="submit" name="decision" value="rejected" class="btn btn-danger {{ 'col-span-2' if r.status == 'approved' }}" onclick="return confirm('Reject this application? The member will be told.');">{{ ui.icon('x') }} Reject</button>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}

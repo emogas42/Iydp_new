@@ -5,30 +5,38 @@ import { Container } from '@/components/ui/Container'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { contactInfo } from '@/data'
 import { csrfFetch } from '@/utils/csrf'
+import { useBotCheck } from '@/hooks/useBotCheck'
 
 const Contact = () => {
   const [form, setForm] = useState({ name: '', email: '', message: '' })
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+  const botCheck = useBotCheck()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSending(true)
+    setError('')
 
     try {
       const formData = new FormData()
-      Object.entries(form).forEach(([k, v]) => formData.append(k, v))
+      Object.entries({ ...form, ...(await botCheck.fields()) }).forEach(([k, v]) => formData.append(k, v))
 
       const res = await csrfFetch('/api/contact', { method: 'POST', body: formData })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
 
       if (data.status === 'success') {
         setSent(true)
         setForm({ name: '', email: '', message: '' })
         setTimeout(() => setSent(false), 4000)
+      } else {
+        const tooMany = res.status === 429
+        setError(tooMany ? 'Too many messages. Please try again in a minute.' : data.message || 'Your message was not sent. Please try again.')
+        botCheck.renew()
       }
     } catch {
-      console.error('Failed to send')
+      setError('Your message was not sent. Please check your connection and try again.')
     } finally {
       setSending(false)
     }
@@ -63,7 +71,7 @@ const Contact = () => {
       <section className="relative bg-gradient-to-br from-white via-slate-50 to-primary-50 py-16 lg:py-24 overflow-hidden">
         <Container className="relative">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
-            <p className="text-accent-green text-sm font-semibold mb-3 uppercase tracking-wider">Contact</p>
+            <p className="text-[#446f25] text-sm font-semibold mb-3 uppercase tracking-wider">Contact</p>
             <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight mb-3">Let's connect</h1>
             <p className="text-slate-500 max-w-xl mx-auto">Reach us for Erasmus+, ESC, partnership and international cooperation inquiries.</p>
           </motion.div>
@@ -97,7 +105,7 @@ const Contact = () => {
                           <Icon className="w-4 h-4" />
                         </span>
                         <div>
-                          <p className="text-[10px] uppercase text-slate-400 font-medium tracking-wider">{item.label}</p>
+                          <p className="text-[10px] uppercase text-slate-500 font-medium tracking-wider">{item.label}</p>
                           <p className="text-sm font-semibold text-slate-900">{item.value}</p>
                         </div>
                       </Wrapper>
@@ -116,6 +124,10 @@ const Contact = () => {
             >
               <div className="bg-slate-50 rounded-2xl p-6 md:p-10 border border-slate-100">
                 <form onSubmit={handleSubmit} className="space-y-5">
+                  {botCheck.trap}
+                  {error && (
+                    <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>
+                  )}
                   <div className="grid sm:grid-cols-2 gap-5">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Full Name</label>

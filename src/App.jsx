@@ -1,7 +1,9 @@
 import { Suspense, lazy } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { AuthProvider } from '@/context/AuthContext'
 import { Navbar } from '@/components/layout/Navbar'
+import { ErrorBoundary } from '@/components/layout/ErrorBoundary'
+import { PageTitle } from '@/components/layout/PageTitle'
 import { Footer } from '@/components/layout/Footer'
 import { ScrollToTop } from '@/components/layout/ScrollToTop'
 import { ScrollProgress } from '@/components/layout/ScrollProgress'
@@ -24,6 +26,9 @@ const Register = lazy(() => import('@/pages/Register').then((m) => ({ default: m
 const Account = lazy(() => import('@/pages/Account').then((m) => ({ default: m.Account })))
 const Profile = lazy(() => import('@/pages/Profile').then((m) => ({ default: m.Profile })))
 const NotFound = lazy(() => import('@/pages/NotFound').then((m) => ({ default: m.NotFound })))
+const VerifyEmail = lazy(() => import('@/pages/VerifyEmail').then((m) => ({ default: m.VerifyEmail })))
+const ForgotPassword = lazy(() => import('@/pages/ForgotPassword').then((m) => ({ default: m.ForgotPassword })))
+const ResetPassword = lazy(() => import('@/pages/ResetPassword').then((m) => ({ default: m.ResetPassword })))
 
 const Loading = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -32,35 +37,44 @@ const Loading = () => (
 )
 
 function App() {
+  const location = useLocation()
+
   return (
     <AuthProvider>
+      <PageTitle />
       <ScrollToTop />
       <ScrollProgress />
       <div className="min-h-screen flex flex-col antialiased">
         <Navbar />
         <main className="flex-1">
-          <Suspense fallback={<Loading />}>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/projects" element={<Projects phase="present" />} />
-              <Route path="/projects/finished" element={<Projects phase="finished" />} />
-              <Route path="/projects/:id" element={<ProjectDetail />} />
-              <Route path="/events" element={<Events />} />
-              <Route path="/events/:id" element={<EventDetail />} />
-              <Route path="/news" element={<News />} />
-              <Route path="/news/:id" element={<NewsDetail />} />
-              <Route path="/stories" element={<Stories />} />
-              <Route path="/stories/:slug" element={<StoryDetail />} />
-              <Route path="/faq" element={<FAQ />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/erasmus" element={<Erasmus />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/account" element={<Account />} />
-              <Route path="/account/profile" element={<Profile />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+          {/* A broken page leaves the menu and footer working, and moving to another page clears it. */}
+          <ErrorBoundary resetKey={location.pathname}>
+            <Suspense fallback={<Loading />}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/projects" element={<Projects phase="present" />} />
+                <Route path="/projects/finished" element={<Projects phase="finished" />} />
+                <Route path="/projects/:id" element={<ProjectDetail />} />
+                <Route path="/events" element={<Events />} />
+                <Route path="/events/:id" element={<EventDetail />} />
+                <Route path="/news" element={<News />} />
+                <Route path="/news/:id" element={<NewsDetail />} />
+                <Route path="/stories" element={<Stories />} />
+                <Route path="/stories/:slug" element={<StoryDetail />} />
+                <Route path="/faq" element={<FAQ />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/erasmus" element={<Erasmus />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/account" element={<Account />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/account/profile" element={<Profile />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </main>
         <Footer />
         <BackToTop />

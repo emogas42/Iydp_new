@@ -1,15 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { LogOut, Hourglass } from 'lucide-react'
+import { api } from '@/utils/api'
 import { Container } from '@/components/ui/Container'
 import { useAuth } from '@/context/AuthContext'
 import { MembershipCard } from '@/components/account/MembershipCard'
 import { ChangePassword } from '@/components/account/ChangePassword'
+import { VerifyEmailNotice } from '@/components/account/VerifyEmailNotice'
+import { DeleteAccount } from '@/components/account/DeleteAccount'
 import { formatDate } from '@/utils/format'
 
 const AZ_MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun', 'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr']
 const APPLICATION_STATUS = { pending: 'Baxılır', accepted: 'Qəbul olunub', rejected: 'Seçilməyib' }
+const EVENT_STATUS = {
+  pending: ['Baxılır', 'text-slate-500'],
+  approved: ['Təsdiqlənib', 'text-[#4f7f2b]'],
+  rejected: ['Qəbul olunmayıb', 'text-[#c7463a]'],
+}
 
 const formatLongDate = (iso) => {
   if (!iso) return ''
@@ -30,14 +38,45 @@ const Account = () => {
   const [data, setData] = useState(null)
   const [requesting, setRequesting] = useState(false)
   const [error, setError] = useState('')
+  const [justVerified, setJustVerified] = useState(false)
+  const neededVerifying = useRef(false)
+  const [deleted, setDeleted] = useState(false)
+
+  useEffect(() => {
+    if (neededVerifying.current && user && !user.email_verification_required) setJustVerified(true)
+    neededVerifying.current = Boolean(user?.email_verification_required)
+  }, [user])
 
   useEffect(() => {
     if (!user) return
     fetch('/api/account')
       .then((res) => (res.ok ? res.json() : null))
-      .then(setData)
+      .then((account) => {
+        setData(account)
+        // The list keeps its "new" marks until they leave; the navbar count clears now.
+        if (account?.notifications?.some((n) => !n.is_read)) {
+          api.markNotificationsRead().then(() => refreshUser()).catch(() => {})
+        }
+      })
       .catch(() => setData(null))
-  }, [user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
+
+  if (deleted) {
+    return (
+      <div className="min-h-screen bg-slate-50 pt-[72px]">
+        <Container narrow className="py-20">
+          <div role="status" className="mx-auto max-w-lg rounded-lg border border-slate-200 bg-white p-8 text-center">
+            <h1 className="text-xl font-semibold text-slate-900">Hesabınız silindi</h1>
+            <p className="mt-2 text-slate-600">Məlumatlarınız silindi və hesabdan çıxış etdiniz.</p>
+            <Link to="/" className="mt-6 inline-flex rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700">
+              Ana səhifə
+            </Link>
+          </div>
+        </Container>
+      </div>
+    )
+  }
 
   if (!loading && !user) {
     return <Navigate to="/login" replace state={{ from: '/account' }} />
@@ -71,7 +110,7 @@ const Account = () => {
     </button>
   )
 
-  const canRequestVip = user && user.card_type === 'standard' && user.vip_status !== 'pending'
+  const canRequestVip = user && user.card_type === 'standard' && user.vip_status !== 'pending' && !user.email_verification_required
 
   return (
     <div className="min-h-screen bg-slate-50 pt-[72px]">
@@ -91,6 +130,15 @@ const Account = () => {
           <div role="alert" className="mb-8 max-w-2xl rounded-md border border-accent-red bg-white p-4 text-sm font-medium text-slate-800">
             {error}
           </div>
+        )}
+
+        {user?.email_verification_required && (
+          <div className="mb-8 max-w-2xl"><VerifyEmailNotice /></div>
+        )}
+        {justVerified && (
+          <p role="status" className="mb-8 max-w-2xl rounded-lg border border-[#4f7f2b]/30 bg-white p-4 text-sm font-medium text-[#4f7f2b]">
+            Email təsdiqləndi. İndi tədbir və layihələrə müraciət edə bilərsiniz.
+          </p>
         )}
 
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-5">
@@ -133,6 +181,23 @@ const Account = () => {
           </div>
 
           <div className="min-w-0 space-y-6 lg:col-span-2">
+            {data?.notifications?.length > 0 && (
+              <Panel title="Bildirişlər">
+                <ul className="space-y-4 text-sm">
+                  {data.notifications.map((n) => (
+                    <li key={n.id}>
+                      <p className="flex items-start gap-2 font-semibold text-slate-900">
+                        {!n.is_read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent-red"><span className="sr-only">Yeni</span></span>}
+                        <span className="min-w-0">{n.link ? <Link to={n.link} className="hover:text-primary-700">{n.title}</Link> : n.title}</span>
+                      </p>
+                      <p className="mt-1 whitespace-pre-line break-words text-slate-600">{n.body}</p>
+                      <p className="mt-1 text-xs text-slate-500">{formatLongDate(n.created_at)}</p>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            )}
+
             {user && (
               <div className="rounded-lg border border-slate-200 bg-white p-6">
                 <div className="flex items-baseline justify-between gap-3">
@@ -171,8 +236,11 @@ const Account = () => {
                 <ul className="space-y-3 text-sm">
                   {data.event_registrations.map((r) => (
                     <li key={r.id} className="flex justify-between gap-4">
-                      <Link to={`/events/${r.event_id}`} className="min-w-0 font-medium text-slate-800 hover:text-primary-700">{r.event_name}</Link>
-                      <span className="shrink-0 text-slate-500">{formatDate(r.starts_at)}</span>
+                      <span className="min-w-0">
+                        <Link to={`/events/${r.event_id}`} className="block font-medium text-slate-800 hover:text-primary-700">{r.event_name}</Link>
+                        <span className="text-xs text-slate-500">{formatDate(r.starts_at)}</span>
+                      </span>
+                      <span className={`shrink-0 font-medium ${EVENT_STATUS[r.status]?.[1] || 'text-slate-500'}`}>{EVENT_STATUS[r.status]?.[0] || r.status}</span>
                     </li>
                   ))}
                 </ul>
@@ -210,6 +278,12 @@ const Account = () => {
         {user && !user.must_change_password && (
           <div className="mt-6 max-w-md lg:ml-auto">
             <ChangePassword onChanged={refreshUser} />
+          </div>
+        )}
+
+        {user && !user.is_admin && (
+          <div className="mt-10 max-w-md lg:ml-auto">
+            <DeleteAccount onDeleted={() => { setDeleted(true); refreshUser() }} />
           </div>
         )}
 

@@ -11,16 +11,35 @@
     <p class="relative text-sm font-medium text-white/80">{{ az_now.strftime('%A') }}, {{ az_now.day }} {{ az_now.strftime('%B %Y') }}</p>
     <h1 class="relative mt-1 text-2xl font-bold tracking-tight sm:text-[28px]">{{ greeting }}, {{ current_user.username }}</h1>
     <p class="relative mt-1.5 text-sm text-white/85">
-        {% if unread_count or pending_vip or pending_applications %}You have things waiting for you below.{% else %}Everything is up to date.{% endif %}
+        {% if unread_count or pending_vip or pending_applications or pending_registrations %}You have things waiting for you below.{% else %}Everything is up to date.{% endif %}
     </p>
 </section>
 
-{% if unread_count or pending_vip or pending_applications %}
+{% if not email_verification_on %}
+<section class="card mb-6 border-ired p-4 text-sm sm:p-5" role="status">
+    <strong class="font-semibold">Email is not set up.</strong>
+    <span class="text-slate-600">Nothing is being sent, and new members are not asked to confirm their address. Set <code>MAIL_*</code> and <code>SITE_URL</code> in the server's <code>.env</code>.</span>
+</section>
+{% elif site_url_problem %}
+<section class="card mb-6 border-ired p-4 text-sm sm:p-5" role="status">
+    <strong class="font-semibold">Check SITE_URL.</strong>
+    <span class="text-slate-600">{{ site_url_problem }}.</span>
+</section>
+{% endif %}
+
+{% if unread_count or pending_vip or pending_applications or pending_registrations %}
 <section class="card mb-6 divide-y divide-slate-200" aria-label="Needs attention">
     {% if unread_count %}
     <a href="{{ url_for('list_messages') }}" class="list-row">
         <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-iblue" aria-hidden="true"></span>
         <span class="min-w-0 flex-1 text-sm"><strong class="font-semibold">{{ unread_count }} unread {{ 'message' if unread_count == 1 else 'messages' }}</strong> <span class="text-slate-500">from the contact form</span></span>
+        {{ ui.icon('chevron-right', 'h-4 w-4 text-slate-400') }}
+    </a>
+    {% endif %}
+    {% if pending_registrations %}
+    <a href="{{ url_for('event_attendance', id=first_pending_event_id, status='pending') }}" class="list-row">
+        <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-ired" aria-hidden="true"></span>
+        <span class="min-w-0 flex-1 text-sm"><strong class="font-semibold">{{ pending_registrations }} event {{ 'application' if pending_registrations == 1 else 'applications' }}</strong> waiting for a decision</span>
         {{ ui.icon('chevron-right', 'h-4 w-4 text-slate-400') }}
     </a>
     {% endif %}

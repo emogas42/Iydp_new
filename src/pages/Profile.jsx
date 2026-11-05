@@ -7,7 +7,7 @@ import { api } from '@/utils/api'
 
 // 16px on phones: iOS Safari zooms the page when a smaller input gets focus.
 const inputClass =
-  'block w-full rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-base text-slate-900 placeholder:text-slate-400 transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100 sm:text-[15px]'
+  'block w-full rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-base text-slate-900 placeholder:text-slate-500 transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100 sm:text-[15px]'
 
 const EMPTY_ROWS = {
   education: { institution: '', level: '', field: '', start_year: '', end_year: '' },
@@ -19,7 +19,7 @@ const Field = ({ label, optional, children }) => (
   <label className="block min-w-0">
     <span className="mb-1.5 flex items-baseline gap-2 text-sm font-medium text-slate-700">
       {label}
-      {optional && <span className="ml-auto text-xs font-normal text-slate-400">İstəyə bağlı</span>}
+      {optional && <span className="ml-auto text-xs font-normal text-slate-500">İstəyə bağlı</span>}
     </span>
     {children}
   </label>

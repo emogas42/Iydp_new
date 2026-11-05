@@ -35,3 +35,6 @@ dist/
 
 # Migrations cache
 migrations/**/__pycache__/
+
+# Test runs
+.pytest_cache/

@@ -8,6 +8,7 @@ Werkzeug==3.1.9
 python-dotenv==1.2.2
 qrcode==7.4.2
 Pillow==13.0.0
+gunicorn==22.0.0
 
 # The site runs on SQLite. If DATABASE_URL ever moves to MySQL, also install
 # PyMySQL; for PostgreSQL, psycopg2-binary.

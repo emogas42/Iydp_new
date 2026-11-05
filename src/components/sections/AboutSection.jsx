@@ -62,7 +62,7 @@ const AboutSection = () => {
                     <Icon className="w-5 h-5" />
                   </div>
                   <p className="font-bold text-slate-900 text-sm">{item.value}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{item.label}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{item.label}</p>
                 </motion.div>
               )
             })}
@@ -79,7 +79,9 @@ const AboutSection = () => {
             >
               <div className="relative">
                 <img
-                  src="/images/iydp-members.jpeg"
+                  src="/images/iydp-members-960.webp"
+                  loading="lazy"
+                  decoding="async"
                   alt="IYDP team collaboration"
                   className="rounded-2xl w-full h-80 lg:h-96 object-cover"
                 />
@@ -125,7 +127,7 @@ const AboutSection = () => {
             viewport={{ once: true }}
             className="text-center mb-12"
           >
-            <span className="inline-block bg-accent-green/10 text-accent-green text-xs font-bold px-4 py-1.5 rounded-full mb-5 uppercase tracking-wider">
+            <span className="inline-block bg-accent-green/10 text-[#446f25] text-xs font-bold px-4 py-1.5 rounded-full mb-5 uppercase tracking-wider">
               Our Mission
             </span>
             <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight">

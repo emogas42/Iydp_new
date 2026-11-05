@@ -3,13 +3,13 @@ import { api } from '@/utils/api'
 
 const MIN_MOTIVATION = 30
 const inputClass =
-  'block w-full rounded-md border border-slate-300 bg-white px-3.5 py-3 text-[15px] text-slate-900 placeholder:text-slate-400 transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
+  'block w-full rounded-md border border-slate-300 bg-white px-3.5 py-3 text-[15px] text-slate-900 placeholder:text-slate-500 transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
 
 const Field = ({ id, label, optional, children }) => (
   <div>
     <label htmlFor={id} className="mb-1.5 flex items-baseline gap-1 text-sm font-semibold text-slate-800">
       {label}
-      {optional && <span className="ml-auto text-xs font-normal text-slate-400">Optional</span>}
+      {optional && <span className="ml-auto text-xs font-normal text-slate-500">Optional</span>}
     </label>
     {children}
   </div>

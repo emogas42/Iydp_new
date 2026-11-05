@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { usePageTitle } from '@/components/layout/PageTitle'
 import { useParams, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Eye, ImageOff } from 'lucide-react'
@@ -38,6 +39,7 @@ const DetailSkeleton = () => (
 const NewsDetail = () => {
   const { id } = useParams()
   const [news, setNews] = useState(null)
+  usePageTitle(news?.title)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -80,7 +82,7 @@ const NewsDetail = () => {
                 <li>
                   <Link to="/" className="text-slate-500 transition-colors hover:text-primary-600">Home</Link>
                 </li>
-                <li aria-hidden="true" className="text-slate-400">/</li>
+                <li aria-hidden="true" className="text-slate-500">/</li>
                 <li>
                   <Link to="/news" className="text-slate-500 transition-colors hover:text-primary-600">News</Link>
                 </li>

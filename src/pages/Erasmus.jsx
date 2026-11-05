@@ -240,7 +240,7 @@ const Erasmus = () => {
             viewport={{ once: true }}
             className="text-center max-w-2xl mx-auto mb-12"
           >
-            <span className="inline-block bg-accent-green/10 text-accent-green text-xs font-semibold px-3 py-1 rounded-full mb-4">
+            <span className="inline-block bg-accent-green/10 text-[#446f25] text-xs font-semibold px-3 py-1 rounded-full mb-4">
               Why Participate?
             </span>
             <h2 className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
@@ -282,7 +282,7 @@ const Erasmus = () => {
             viewport={{ once: true }}
             className="text-center max-w-2xl mx-auto mb-12"
           >
-            <span className="inline-block bg-accent-red/10 text-accent-red text-xs font-semibold px-3 py-1 rounded-full mb-4">
+            <span className="inline-block bg-accent-red/10 text-[#b83f33] text-xs font-semibold px-3 py-1 rounded-full mb-4">
               History
             </span>
             <h2 className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">

@@ -8,10 +8,24 @@
 
 <div class="grid grid-cols-1 gap-5 lg:grid-cols-5 [&>*]:min-w-0">
     <div class="space-y-5 lg:col-span-3">
+        {% if a.answers %}
+        <section class="card">
+            <div class="card-header"><h2 class="card-title">Answers</h2></div>
+            <dl class="divide-y divide-slate-100">
+                {% for answer in a.answers %}
+                <div class="px-4 py-3.5 sm:px-5">
+                    <dt class="text-sm text-slate-500">{{ answer.label }}</dt>
+                    <dd class="mt-1 whitespace-pre-line break-words text-[15px] text-ink">{% if answer.value is string %}{{ answer.value or '—' }}{% else %}{{ answer.value|join(', ') or '—' }}{% endif %}</dd>
+                </div>
+                {% endfor %}
+            </dl>
+        </section>
+        {% else %}
         <section class="card">
             <div class="card-header"><h2 class="card-title">Motivation</h2></div>
             <p class="whitespace-pre-line p-4 text-[15px] leading-relaxed text-slate-700 sm:p-5">{{ a.motivation or '—' }}</p>
         </section>
+        {% endif %}
 
         <section class="card">
             <div class="card-header"><h2 class="card-title">Details</h2></div>
@@ -59,7 +73,13 @@
                 <option value="accepted" {{ 'selected' if a.status == 'accepted' }}>Accepted</option>
                 <option value="rejected" {{ 'selected' if a.status == 'rejected' }}>Rejected</option>
             </select>
-            <p class="hint">The applicant sees this on their account page.</p>
+            <p class="hint">When you accept or reject, the applicant is told on their account page and by email.</p>
+            {% if a.email_status == 'failed' %}<p class="mt-2 text-sm font-medium text-ired-dark">The last email could not be sent. They can still see the decision on their account page.</p>{% endif %}
+        </div>
+        <div>
+            <label for="message" class="label">Message to the applicant <span class="optional">Optional</span></label>
+            <textarea id="message" name="message" rows="3" maxlength="1000" class="input resize-y">{{ a.decision_note or '' }}</textarea>
+            <p class="hint">Goes out with the decision.</p>
         </div>
         <div>
             <label for="admin_note" class="label">Team note <span class="optional">Only admins see this</span></label>

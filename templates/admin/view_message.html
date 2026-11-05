@@ -13,9 +13,7 @@
             <a href="mailto:{{ message.email }}" class="link block truncate text-sm font-medium">{{ message.email }}</a>
         </div>
     </div>
-    <div class="p-4 text-[15px] leading-relaxed text-slate-700 sm:p-5">
-        {{ message.message|replace('\n', '<br>')|safe }}
-    </div>
+    <div class="whitespace-pre-line break-words p-4 text-[15px] leading-relaxed text-slate-700 sm:p-5">{{ message.message }}</div>
 </article>
 
 <div class="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">

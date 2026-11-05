@@ -4,7 +4,7 @@ const PartnersSection = () => {
   return (
     <section className="py-16 bg-slate-50 border-y border-slate-100 overflow-hidden">
       <div className="max-w-7xl mx-auto px-5 lg:px-8 mb-10">
-        <p className="text-center text-slate-400 text-sm font-semibold uppercase tracking-wider">
+        <p className="text-center text-slate-500 text-sm font-semibold uppercase tracking-wider">
           Our partner organizations
         </p>
       </div>
@@ -17,7 +17,7 @@ const PartnersSection = () => {
           {[...partners, ...partners].map((name, i) => (
             <span
               key={i}
-              className="text-slate-400 hover:text-slate-600 font-semibold text-lg shrink-0 transition-colors cursor-default"
+              className="text-slate-500 hover:text-slate-600 font-semibold text-lg shrink-0 transition-colors cursor-default"
             >
               {name}
             </span>

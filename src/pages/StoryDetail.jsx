@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { usePageTitle } from '@/components/layout/PageTitle'
 import { useParams, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Images } from 'lucide-react'
@@ -61,6 +62,7 @@ const DetailSkeleton = () => (
 const StoryDetail = () => {
   const { slug } = useParams()
   const [story, setStory] = useState(null)
+  usePageTitle(story?.title)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -104,7 +106,7 @@ const StoryDetail = () => {
             <motion.nav aria-label="Breadcrumb" {...fadeUp(0)}>
               <ol className="flex flex-wrap items-center gap-1.5 text-sm">
                 <li><Link to="/" className="text-slate-500 transition-colors hover:text-primary-600">Home</Link></li>
-                <li aria-hidden="true" className="text-slate-400">/</li>
+                <li aria-hidden="true" className="text-slate-500">/</li>
                 <li><Link to="/stories" className="text-slate-500 transition-colors hover:text-primary-600">Stories</Link></li>
               </ol>
             </motion.nav>

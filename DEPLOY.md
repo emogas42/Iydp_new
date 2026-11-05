@@ -1,9 +1,57 @@
 # Yükləmə təlimatı
 
-Sayt cPanel hostinqində işləyir. `app.py` Passenger ilə işə düşür, React tətbiqi (`src/`)
-build olunub Flask tərəfindən serve edilir, `/admin/*` isə ayrıca server-rendered admin paneldir.
+React tətbiqi (`src/`) build olunub Flask tərəfindən serve edilir, `/admin/*` isə ayrıca
+server-rendered admin paneldir. Python 3.10+ lazımdır. Aşağıda VPS üçün yeniləmə qaydası, sonra
+cPanel variantı var.
 
-Hostinq planında **Setup Python App** olmalıdır: hər cPanel planında olmur. Python 3.10+ lazımdır.
+## VPS-də mövcud saytı yeniləmək
+
+**Toxunulmamalı olanlar:** serverdəki `.env`, `instance/` (baza) və `static/uploads/` (şəkillər).
+
+1. **Əvvəlcə nüsxə götürün:** baza və `static/uploads/`. PostgreSQL-dirsə `pg_dump`. Bəzi köhnə
+   sütunlar və cədvəllər dəyişir, nüsxəsiz başlamayın.
+2. Yeni kodu köhnənin üzərinə qoyun, yuxarıdakı üç yeri silmədən.
+3. Paketlər: `pip install -r requirements.txt` (Flask 2.3 → 3.1, Pillow əlavə olunub).
+4. `.env`-ə yeniləri əlavə edin, `.env.example`-a baxın: `TRUSTED_PROXY_HOPS`, `SITE_URL`, `MAIL_*`.
+5. Baza: `FLASK_APP=app.py flask db upgrade`. Bazada hansı versiya olsa da, çatışmayanları əlavə edir.
+6. `dist/` zip-də hazırdır. Git-dən yeniləyirsinizsə: `npm ci && npm run build`.
+7. Servisi restart edin. `gunicorn app:app`, `requirements.txt`-dədir.
+8. nginx-də `client_max_body_size 80m;` olsun, yoxsa böyük şəkil albomları yüklənmir. HTTPS-in düzgün
+   tanınması üçün `proxy_set_header X-Forwarded-Proto $scheme;` da lazımdır. Sürət üçün `gzip on;` əlavə edin
+   (`js`, `css`, `svg`, `json`).
+9. Gündəlik ehtiyat nüsxə üçün cron: `cd /layihə && venv/bin/python scripts/backup_db.py` (yalnız SQLite).
+
+**Email təsdiqi:** `MAIL_*` və `SITE_URL` dolu olanda işə düşür. Üzvə link gedir, 24 saat işləyir.
+Üzv hesaba girə bilir, amma təsdiqdən
+əvvəl tədbirə, layihəyə müraciət edə və VIP istəyə bilmir. Köhnə hesablar da bir dəfə təsdiq edir.
+Bu dəyərlər boş olsa, heç kimdən təsdiq istənmir və admin panelin ana səhifəsində xəbərdarlıq görünür.
+Məktubu çatmayan üzvü admin **Members** səhifəsindən əl ilə təsdiqləyə bilər.
+
+**Əlaqə mesajları:** `CONTACT_NOTIFY_EMAIL` doludursa, saytdan gələn hər mesaj həmin ünvana da mail
+ilə gedir, cavab vuranda birbaşa yazana çatır. Boşdursa, yalnız admin paneldə görünür.
+
+**Şifrəni unutmaq:** giriş səhifəsindəki **Şifrəni unutmusunuz?** üzvə 1 saatlıq link göndərir. Link bir
+dəfə işləyir, şifrə dəyişəndə bütün cihazlarda çıxış olur. `MAIL_*` və `SITE_URL` boşdursa işləmir: o zaman
+admin **Members** səhifəsindən müvəqqəti şifrə verir. Admin hesablarına bu yolla link göndərilmir.
+
+**Məktublar spama düşməsin deyə:** domenin DNS-i Cloudflare-dədir, ona görə SPF və DKIM qeydləri
+avtomatik yazılmır, Cloudflare-ə əl ilə əlavə olunmalıdır.
+1. konsoleH-də domen üçün DKIM-i aktiv edin, göstərilən TXT qeydini Cloudflare-ə əlavə edin (DNS only).
+2. SPF qeydini konsoleH-in göstərdiyi dəyərlə əvəz edin. Domendə yalnız bir SPF qeydi olmalıdır.
+3. Serverdə `SITE_URL=https://iydp.org` olsun. `127.0.0.1` və ya rəqəmli ünvan olmasın.
+4. `python scripts/test_mail.py <ünvan>` ilə Gmail-ə məktub göndərin. "Show original"-da `spf=pass`,
+   `dkim=pass`, `dmarc=pass` görünməlidir.
+
+**Yenilənmədən sonra:**
+- Bütün istifadəçilər bir dəfə hesabdan çıxmış olur, sessiya formatı dəyişib.
+- Köhnə kod ilk admini `admin123` şifrəsi ilə yaradırdı. Admin paneldə **Settings**-dən dəyişin.
+- `blog_post` cədvəli silinmir, amma sayt artıq onu istifadə etmir. Stories ayrıca doldurulur.
+- Formasız tədbirlərə müraciət bağlı olur. Admin hər tədbir üçün **Create form** ilə forma qurur.
+
+## cPanel variantı
+
+Hostinq planında **Setup Python App** olmalıdır: hər cPanel planında olmur. `app.py` Passenger ilə
+(`passenger_wsgi.py`) işə düşür.
 
 ---
 
@@ -65,6 +113,18 @@ Admin hesabı ilk işə düşmədə yaradılır. Giriş etdikdən sonra `ADMIN_P
 cPanel → Setup Python App → "Restart" düyməsini basın ki, dəyişikliklər tətbiq olunsun.
 
 ---
+
+## Testlər
+
+Yeniləmədən əvvəl lokal kompüterdə işlədin. Hər yoxlama öz yeni bazası ilə işləyir, real bazaya,
+`static/uploads/`-a və real maillərə toxunmur:
+
+```bash
+pip install -r requirements-dev.txt
+npm install && npm run build
+pytest tests -m "not browser"   # sürətli
+pytest tests                    # brauzer yoxlamaları ilə, Google Chrome lazımdır
+```
 
 ## Verilənlər bazası və ehtiyat nüsxə
 
@@ -129,6 +189,15 @@ qəbul edilə bilər; böyük tətbiq üçün Redis-based storage (`Limiter(stor
   kart), `/faq`, `/stories` (+ `/stories/:slug`), `/erasmus`. Bu səhifələr real `/api/*` endpoint-lərindən
   (admin panel-dən idarə olunan) data çəkir. `npm run build` ilə `dist/`-ə yığılır,
   Flask onu serve edir.
+
+**Tədbir qeydiyyatı:** admin hər tədbir üçün Events → tədbir → **Form** bölməsində sualları
+yaradır, forma olmayan tədbirə müraciət etmək olmur. Üzvün müraciəti gözləmədə qalır, yeri yalnız
+adminin təsdiqi tutur. Qərardan sonra üzv "Hesabım"da bildiriş görür, `MAIL_*` dəyərləri `.env`-də
+doludursa email də alır. Formalı tədbirdə QR skaner təsdiqsiz üzvü dayandırır, amma admin
+**Let in anyway** ilə buraxa bilər.
+
+**Layihə forması:** Projects → layihə → **Form** bölməsində eyni üsulla suallar yaradılır. Sual
+yoxdursa, üzv standart müraciət formasını görür. Qəbul və ya rədd qərarından üzvə bildiriş gedir.
 
 **Üzv profili:** `/account/profile` səhifəsində üzv təhsil, təcrübə, dil və digər
 məlumatlarını doldurur. Admin onları üzvün səhifəsində görür. Layihə formasında

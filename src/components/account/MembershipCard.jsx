@@ -68,7 +68,7 @@ const MembershipCard = ({ user }) => {
           </div>
         </div>
       </div>
-      <p className="mt-5 text-center text-xs font-medium text-slate-400">Kartı çevirmək üçün üzərinə toxunun</p>
+      <p className="mt-5 text-center text-xs font-medium text-slate-500">Kartı çevirmək üçün üzərinə toxunun</p>
     </div>
   )
 }

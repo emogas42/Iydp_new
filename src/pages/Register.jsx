@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { UserPlus } from 'lucide-react'
 import { Container } from '@/components/ui/Container'
 import { useAuth } from '@/context/AuthContext'
+import { useBotCheck } from '@/hooks/useBotCheck'
 
 const Register = () => {
   const { user, loading, register } = useAuth()
@@ -11,6 +12,7 @@ const Register = () => {
   const [form, setForm] = useState({ full_name: '', email: '', phone: '', password: '', confirm_password: '' })
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const botCheck = useBotCheck()
 
   // A successful sign-up sets `user`, so this is also the redirect after submit.
   if (!loading && user) {
@@ -24,9 +26,10 @@ const Register = () => {
     setError('')
     setSubmitting(true)
     try {
-      await register(form)
+      await register({ ...form, ...(await botCheck.fields()) })
     } catch (err) {
       setError(err.message)
+      botCheck.renew()
     } finally {
       setSubmitting(false)
     }
@@ -121,6 +124,7 @@ const Register = () => {
             >
               {submitting ? 'Yaradılır...' : (<>Hesab yarat <UserPlus className="w-4 h-4" /></>)}
             </button>
+            {botCheck.trap}
           </form>
 
           <p className="text-center text-sm text-slate-500 font-medium mt-8">

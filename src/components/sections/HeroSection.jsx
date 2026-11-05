@@ -3,9 +3,9 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/Button'
 
 const heroWords = [
-  { text: 'exchanges', color: '#00aef6' },
-  { text: 'volunteering', color: '#f06e60' },
-  { text: 'training', color: '#7dba4e' },
+  { text: 'exchanges', color: '#006fa9' },
+  { text: 'volunteering', color: '#c8493c' },
+  { text: 'training', color: '#4f7f2b' },
   { text: 'solidarity', color: '#6f3d90' },
 ]
 
@@ -26,11 +26,16 @@ const HeroSection = () => {
     <section className="relative min-h-screen overflow-hidden">
       <div className="absolute inset-0">
         <img
-          src="/images/iydp-members.jpeg"
+          src="/images/iydp-members-1920.webp"
+          srcSet="/images/iydp-members-960.webp 960w, /images/iydp-members-1920.webp 1920w"
+          sizes="100vw"
+          width="1920"
+          height="1683"
+          fetchpriority="high"
           alt="IYDP youth team"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/30 to-black/55" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/70 lg:from-black/60 lg:via-black/40 lg:to-black/60" />
       </div>
 
       <div className="relative max-w-7xl mx-auto px-5 lg:px-8 pt-28 lg:pt-36 pb-20 min-h-screen flex items-center justify-center text-center">

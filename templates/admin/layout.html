@@ -12,7 +12,7 @@
     ('Content', [
         ('list_news', 'News', 'newspaper', ['list_news', 'add_news', 'edit_news'], 0, 'text-igreen'),
         ('list_stories', 'Stories', 'book-open', ['list_stories', 'add_story', 'edit_story'], 0, 'text-ipurple'),
-        ('list_opportunities', 'Projects', 'briefcase', ['list_opportunities', 'add_opportunity', 'edit_opportunity'], 0, 'text-ired'),
+        ('list_opportunities', 'Projects', 'briefcase', ['list_opportunities', 'add_opportunity', 'edit_opportunity', 'project_form'], 0, 'text-ired'),
         ('list_applications', 'Applications', 'clipboard-list', ['list_applications', 'view_application'], pending_applications, 'text-ired'),
     ]),
     ('People', [
@@ -21,7 +21,7 @@
         ('list_vip_requests', 'VIP requests', 'crown', ['list_vip_requests'], pending_vip, 'text-ipurple'),
     ]),
     ('Events', [
-        ('list_events', 'Events', 'calendar-days', ['list_events', 'add_event', 'edit_event', 'event_attendance'], 0, 'text-ired'),
+        ('list_events', 'Events', 'calendar-days', ['list_events', 'add_event', 'edit_event', 'event_attendance', 'event_form', 'event_registration'], pending_registrations_count or 0, 'text-ired'),
         ('scanner', 'QR scanner', 'qr-code', ['scanner'], 0, 'text-iblue'),
     ]),
 ] %}
@@ -155,7 +155,7 @@
             <button type="button" data-menu-open class="flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-slate-500" aria-controls="mobile-menu" aria-expanded="false">
                 <span class="relative">
                     {{ icon('ellipsis', 'h-[22px] w-[22px]') }}
-                    {% if pending_vip or pending_applications %}<span class="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-ired"></span>{% endif %}
+                    {% if pending_vip or pending_applications or pending_registrations_count %}<span class="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-ired"></span>{% endif %}
                 </span>
                 More
             </button>

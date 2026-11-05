@@ -87,7 +87,7 @@ const Events = () => {
           <motion.nav aria-label="Breadcrumb" {...fadeUp(0)}>
             <ol className="flex items-center justify-center gap-1.5 text-sm">
               <li><Link to="/" className="text-slate-500 transition-colors hover:text-primary-600">Home</Link></li>
-              <li aria-hidden="true" className="text-slate-400">/</li>
+              <li aria-hidden="true" className="text-slate-500">/</li>
               <li aria-current="page" className="text-slate-800">Events</li>
             </ol>
           </motion.nav>

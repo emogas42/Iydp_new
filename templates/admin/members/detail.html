@@ -26,6 +26,20 @@
                     <dd class="min-w-0 truncate text-right font-medium">{% if member.email %}<a href="mailto:{{ member.email }}" class="link font-medium">{{ member.email }}</a>{% else %}—{% endif %}</dd>
                 </div>
                 <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+                    <dt class="text-slate-500">Email status</dt>
+                    <dd class="flex items-center justify-end gap-2 text-right">
+                        {% if member.email_verified_at %}
+                        <span class="badge badge-green">Confirmed</span>
+                        {% else %}
+                        <span class="badge badge-amber">Not confirmed</span>
+                        <form action="{{ url_for('verify_member_email', id=member.id) }}" method="POST" onsubmit="return confirm('Mark this email as confirmed? Do this only if you know the address is really theirs.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="link text-sm font-medium">Confirm</button>
+                        </form>
+                        {% endif %}
+                    </dd>
+                </div>
+                <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
                     <dt class="text-slate-500">Phone</dt>
                     <dd class="text-right font-medium">{% if member.phone %}<a href="tel:{{ member.phone|replace(' ', '') }}" class="link font-medium">{{ member.phone }}</a>{% else %}—{% endif %}</dd>
                 </div>
@@ -93,6 +107,21 @@
                     <button type="submit" class="btn btn-success w-full">{{ ui.icon('check', 'h-3.5 w-3.5') }} Payment received, activate VIP</button>
                 </form>
                 {% endif %}
+            </div>
+        </section>
+
+        <section class="card" aria-labelledby="delete-heading">
+            <div class="card-header"><h2 id="delete-heading" class="card-title">Delete account</h2></div>
+            <div class="p-4 sm:p-5">
+                <p class="text-sm text-slate-600">Permanently removes the profile, applications, event registrations, check-ins and card. This cannot be undone. Payment records stay, without a name, for the accounts.</p>
+                <form action="{{ url_for('delete_member', id=member.id) }}" method="POST" class="mt-4 space-y-3" onsubmit="return confirm('Permanently delete this account?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div>
+                        <label for="delete-confirm" class="label">Type DELETE to confirm</label>
+                        <input type="text" id="delete-confirm" name="confirm_word" class="input" required pattern="DELETE" autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-danger w-full">{{ ui.icon('trash-2', 'h-4 w-4') }} Delete account</button>
+                </form>
             </div>
         </section>
     </div>

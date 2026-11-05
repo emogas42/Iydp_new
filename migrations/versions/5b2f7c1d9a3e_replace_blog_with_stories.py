@@ -56,26 +56,27 @@ def upgrade():
         )
         op.create_index('ix_story_photo_story_id', 'story_photo', ['story_id'], unique=False)
 
-    if 'blog_post' in tables:
-        op.drop_table('blog_post')
+    # blog_post stays: the site no longer uses it, but a live server may hold posts
+    # someone still wants. Dropping it is a separate, deliberate step.
 
 
 def downgrade():
-    op.create_table(
-        'blog_post',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('title', sa.String(length=200), nullable=False),
-        sa.Column('content', sa.Text(), nullable=False),
-        sa.Column('excerpt', sa.Text(), nullable=True),
-        sa.Column('image_url', sa.String(length=255), nullable=True),
-        sa.Column('slug', sa.String(length=255), nullable=False),
-        sa.Column('is_published', sa.Boolean(), nullable=True),
-        sa.Column('view_count', sa.Integer(), nullable=False),
-        sa.Column('created_at', sa.DateTime(), nullable=True),
-        sa.Column('updated_at', sa.DateTime(), nullable=True),
-        sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('slug'),
-    )
+    if 'blog_post' not in sa.inspect(op.get_bind()).get_table_names():
+        op.create_table(
+            'blog_post',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('title', sa.String(length=200), nullable=False),
+            sa.Column('content', sa.Text(), nullable=False),
+            sa.Column('excerpt', sa.Text(), nullable=True),
+            sa.Column('image_url', sa.String(length=255), nullable=True),
+            sa.Column('slug', sa.String(length=255), nullable=False),
+            sa.Column('is_published', sa.Boolean(), nullable=True),
+            sa.Column('view_count', sa.Integer(), nullable=False),
+            sa.Column('created_at', sa.DateTime(), nullable=True),
+            sa.Column('updated_at', sa.DateTime(), nullable=True),
+            sa.PrimaryKeyConstraint('id'),
+            sa.UniqueConstraint('slug'),
+        )
     op.drop_index('ix_story_photo_story_id', table_name='story_photo')
     op.drop_table('story_photo')
     op.drop_index('ix_story_slug', table_name='story')

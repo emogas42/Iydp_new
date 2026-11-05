@@ -124,16 +124,24 @@ const Navbar = () => {
           >
             {user && <UserCircle className="w-4 h-4" />}
             Hesabım
+            {user?.unread_notifications > 0 && (
+              <span className="ml-1 min-w-[1.25rem] rounded-full bg-accent-red px-1.5 text-center text-xs font-bold leading-5 text-white">
+                {user.unread_notifications}<span className="sr-only"> yeni bildiriş</span>
+              </span>
+            )}
           </Link>
           <Button to="/contact" size="sm" className="hidden lg:inline-flex" arrow>
             Join Us
           </Button>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="lg:hidden p-4  cursor-pointer flex items-center jsutify-center  w-30 h-30 text-slate-700  rounded-lg transition"
+            className="relative lg:hidden p-4  cursor-pointer flex items-center jsutify-center  w-30 h-30 text-slate-700  rounded-lg transition"
             aria-label="Toggle menu"
           >
             {mobileOpen ? <X /> : <Menu />}
+            {!mobileOpen && user?.unread_notifications > 0 && (
+              <span aria-hidden="true" className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-white bg-accent-red" />
+            )}
           </button>
         </div>
       </nav>
@@ -224,6 +232,11 @@ const Navbar = () => {
                 >
                   {user && <UserCircle className="w-4 h-4" />}
                   Hesabım
+                  {user?.unread_notifications > 0 && (
+              <span className="ml-1 min-w-[1.25rem] rounded-full bg-accent-red px-1.5 text-center text-xs font-bold leading-5 text-white">
+                {user.unread_notifications}<span className="sr-only"> yeni bildiriş</span>
+              </span>
+            )}
                 </NavLink>
                 <div className="pt-4 border-t border-slate-100">
                   <Button to="/contact" className="w-full" arrow>

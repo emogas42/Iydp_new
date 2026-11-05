@@ -175,7 +175,7 @@ const FAQ = () => {
               <li>
                 <Link to="/" className="text-slate-500 transition-colors hover:text-primary-600">Home</Link>
               </li>
-              <li aria-hidden="true" className="text-slate-400">/</li>
+              <li aria-hidden="true" className="text-slate-500">/</li>
               <li aria-current="page" className="text-slate-800">FAQ</li>
             </ol>
           </motion.nav>
@@ -189,14 +189,14 @@ const FAQ = () => {
 
           <motion.div {...fadeUp(0.16)} className="relative mx-auto mt-10 max-w-2xl">
             <label htmlFor="faq-search" className="sr-only">Search questions</label>
-            <Search className="pointer-events-none absolute left-5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-500" />
             <input
               id="faq-search"
               type="search"
               placeholder="Enter a keyword"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-base border border-slate-200/80 bg-white/90 py-4 pl-[52px] pr-12 text-base text-slate-800 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.12)] backdrop-blur placeholder:text-slate-400 transition focus:border-primary-300 focus:outline-none focus:ring-4 focus:ring-primary-100 [&::-webkit-search-cancel-button]:hidden"
+              className="w-full rounded-base border border-slate-200/80 bg-white/90 py-4 pl-[52px] pr-12 text-base text-slate-800 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.12)] backdrop-blur placeholder:text-slate-500 transition focus:border-primary-300 focus:outline-none focus:ring-4 focus:ring-primary-100 [&::-webkit-search-cancel-button]:hidden"
             />
             <AnimatePresence>
               {search && (
@@ -207,7 +207,7 @@ const FAQ = () => {
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
-                  className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
                 >
                   <X className="h-4 w-4" />
                 </motion.button>

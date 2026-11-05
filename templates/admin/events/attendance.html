@@ -5,6 +5,7 @@
 {% block content %}
 {% set subtitle = [event.starts_at|datetimeformat('%d %b %Y, %H:%M') if event.starts_at else None, event.location]|select|join(' · ') %}
 {% call ui.page_header(event.name, subtitle or None, back=url_for('list_events'), back_label='Events', icon_name='calendar-days', color='text-ired') %}
+    <a href="{{ url_for('event_form', id=event.id) }}" class="btn btn-secondary">{{ ui.icon('clipboard-list') }} {{ 'Form' if event.has_form else 'Create form' }}</a>
     <a href="{{ url_for('edit_event', id=event.id) }}" class="btn btn-secondary">{{ ui.icon('pencil') }} Edit</a>
     {% if event.is_active %}
     <a href="{{ url_for('scanner') }}" class="btn btn-primary">{{ ui.icon('qr-code') }} Scan</a>
@@ -12,12 +13,17 @@
 {% endcall %}
 
 {% if not event.is_public %}
-<p class="card mb-4 px-4 py-3 text-sm text-slate-600">This event is hidden from the website. Turn on “Show on website” in Edit to open registration.</p>
+<p class="card mb-4 px-4 py-3 text-sm text-slate-600">This event is hidden from the website. Turn on “Show on website” in Edit to open applications.</p>
+{% elif not event.has_form %}
+<div class="card mb-4 flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <p class="text-sm font-medium text-ink">Applications are closed until you add questions to the registration form.</p>
+    <a href="{{ url_for('event_form', id=event.id) }}" class="btn btn-primary shrink-0">{{ ui.icon('plus') }} Create form</a>
+</div>
 {% endif %}
 
 <section class="mb-6 grid grid-cols-3 gap-3" aria-label="Summary">
     {% for label, value in [
-        ('Registered', event.registrations|length),
+        ('Approved', event.approved_count),
         ('Checked in', event.attendances|length),
         ('Seats left', event.spots_left if event.capacity else 'No limit'),
     ] %}
@@ -28,31 +34,48 @@
     {% endfor %}
 </section>
 
+<nav class="mb-3 flex gap-1 overflow-x-auto" aria-label="Filter applications">
+    {% for key, label, count in [
+        ('', 'All', all_count),
+        ('pending', 'Waiting', event.pending_count),
+        ('approved', 'Approved', event.approved_count),
+        ('rejected', 'Rejected', event.rejected_count),
+    ] %}
+    <a href="{{ url_for('event_attendance', id=event.id, status=key or None) }}" {% if status == key %}aria-current="page"{% endif %}
+       class="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-md px-3.5 text-sm font-medium {{ 'bg-ink text-white' if status == key else 'text-slate-600 hover:bg-slate-100' }}">
+        {{ label }} <span class="tabular-nums {{ 'text-white/70' if status == key else 'text-slate-400' }}">{{ count }}</span>
+    </a>
+    {% endfor %}
+</nav>
+
 <div class="card overflow-hidden">
     <div class="card-header">
-        <h2 class="card-title">People</h2>
-        {% if people %}
+        <h2 class="card-title">Registered people</h2>
+        {% if all_count %}
         <a href="{{ url_for('export_event_attendance', id=event.id) }}" class="link inline-flex items-center gap-1 text-sm">{{ ui.icon('download', 'h-3.5 w-3.5') }} CSV</a>
         {% endif %}
     </div>
     {% if people %}
     <ul class="divide-y divide-slate-100">
-        {% for user, registered_at, checked_in_at in people %}
+        {% for user, registration, attendance in people %}
         <li>
-            <a href="{{ url_for('view_member', id=user.id) }}" class="list-row">
+            <a href="{{ url_for('event_registration', event_id=event.id, id=registration.id) if registration else url_for('view_member', id=user.id) }}" class="list-row">
                 {{ ui.initials_avatar(user.display_name) }}
                 <span class="min-w-0 flex-1">
                     <span class="block truncate text-sm font-medium text-ink">{{ user.display_name }}</span>
                     <span class="block truncate text-xs text-slate-500">{{ user.card_label }} · {{ user.membership_no or user.email or '' }}</span>
                 </span>
-                {% if checked_in_at %}<span class="badge badge-green">In{% if not registered_at %}, walk-in{% endif %}</span>
-                {% else %}<span class="badge badge-slate">Registered</span>{% endif %}
+                {% if attendance %}<span class="badge badge-green">In{% if not registration or registration.status != 'approved' %}, walk-in{% endif %}</span>
+                {% else %}{{ ui.registration_badge(registration.status) }}{% endif %}
+                {{ ui.icon('chevron-right', 'h-3.5 w-3.5 text-slate-300') }}
             </a>
         </li>
         {% endfor %}
     </ul>
+    {% elif status %}
+    {{ ui.empty('Nothing here', 'No applications with this status.') }}
     {% else %}
-    {{ ui.empty('No one yet', 'People who register on the website or get scanned at the entrance appear here.') }}
+    {{ ui.empty('No one yet', 'People who apply on the website or get scanned at the entrance appear here.') }}
     {% endif %}
 </div>
 {% endblock %}

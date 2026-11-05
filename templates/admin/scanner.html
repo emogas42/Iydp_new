@@ -3,7 +3,7 @@
 {% block title %}QR scanner{% endblock %}
 
 {% block head %}
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/html5-qrcode-2.3.8.min.js') }}"></script>
 <style>
     #qr-reader { border: 0 !important; }
     #qr-reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
@@ -51,6 +51,7 @@
             <div class="min-w-0">
                 <p id="result-title" class="text-base font-semibold text-slate-500">Waiting for a scan</p>
                 <p id="result-subtitle" class="mt-0.5 text-sm text-slate-500">Point the camera at a member’s card.</p>
+                <button type="button" id="override-btn" class="btn btn-secondary mt-3 hidden">Let in anyway</button>
             </div>
         </div>
 
@@ -84,13 +85,16 @@
     var subtitle = document.getElementById('result-subtitle');
     var recentList = document.getElementById('recent-list');
     var recentCount = document.getElementById('recent-count');
+    var overrideBtn = document.getElementById('override-btn');
+    var refusedCode = null;
 
     var scanner = null, busy = false, count = 0;
 
     var KINDS = {
         ok:        { icon: 'ok',   color: 'text-igreen-dark', panel: 'border-igreen bg-igreen-soft', label: 'Checked in',         badge: 'badge-green', vibrate: [60] },
         duplicate: { icon: 'warn', color: 'text-iblue-dark',  panel: 'border-iblue bg-iblue-soft',   label: 'Already checked in', badge: 'badge-blue',  vibrate: [60, 60, 60] },
-        invalid:   { icon: 'bad',  color: 'text-ired-dark',   panel: 'border-ired bg-ired-soft',     label: 'Not recognised',     badge: 'badge-red',   vibrate: [200] }
+        invalid:   { icon: 'bad',  color: 'text-ired-dark',   panel: 'border-ired bg-ired-soft',     label: 'Not recognised',     badge: 'badge-red',   vibrate: [200] },
+        not_approved: { icon: 'bad', color: 'text-ired-dark', panel: 'border-ired bg-ired-soft', label: 'Not approved', badge: 'badge-red', vibrate: [80, 60, 80] },
     };
 
     function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
@@ -120,19 +124,28 @@
         recentList.prepend(li);
     }
 
-    async function onScan(text) {
-        if (busy) return;
+    async function onScan(text, override) {
+        override = override === true;
+        // The camera keeps seeing the same card: don't wipe the decision waiting on screen.
+        if (!override && (busy || text === refusedCode)) return;
         busy = true;
+        refusedCode = null;
+        overrideBtn.classList.add('hidden');
         try {
             var resp = await fetch('{{ url_for("scanner_checkin") }}', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
-                body: JSON.stringify({ event_id: eventSelect.value, code: text })
+                body: JSON.stringify({ event_id: eventSelect.value, code: text, override: override })
             });
             var data = await resp.json();
             var meta = [data.card ? data.card + ' card' : null, data.membership_no, data.registered === false ? 'not registered' : null].filter(Boolean).join(' · ');
             if (data.status === 'ok') setResult('ok', data.name || 'Checked in', meta);
             else if (data.status === 'duplicate') setResult('duplicate', (data.name || 'Member') + ' is already in', 'Checked in at ' + (data.time || ''));
+            else if (data.status === 'not_approved') {
+                setResult('not_approved', data.name || 'Member', [data.reason, data.card ? data.card + ' card' : null].filter(Boolean).join(' · '));
+                refusedCode = text;
+                overrideBtn.classList.remove('hidden');
+            }
             else setResult('invalid', 'Code not recognised', data.message || '');
             addRecent(data.status, data.name, data.time);
         } catch (e) {
@@ -140,6 +153,8 @@
         }
         setTimeout(function () { busy = false; }, 1800);
     }
+
+    overrideBtn.addEventListener('click', function () { onScan(refusedCode, true); });
 
     startBtn.addEventListener('click', async function () {
         startBtn.disabled = true;

@@ -10,6 +10,9 @@
 
 {% block content %}
 {% call ui.page_header('Applications', project.title if project else items.total ~ ' total', back=url_for('edit_opportunity', id=project.id) if project else None, back_label='Project', icon_name='clipboard-list', color='text-ired') %}
+    {% if project %}
+    <a href="{{ url_for('project_form', id=project.id) }}" class="btn btn-secondary">{{ ui.icon('clipboard-list') }} {{ 'Form' if project.has_form else 'Create form' }}</a>
+    {% endif %}
     {% if items.total %}
     <a href="{{ url_for('export_applications', project=project_id, status=status or None) }}" class="btn btn-secondary">{{ ui.icon('download') }} CSV</a>
     {% endif %}

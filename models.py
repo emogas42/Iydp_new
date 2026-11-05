@@ -28,6 +28,13 @@ AZ_TZ = timezone(timedelta(hours=4))
 # Membership card types shown on the account page and at the QR scanner.
 CARD_LABELS = {'standard': 'Standard', 'vip': 'VIP', 'member': 'Member'}
 
+# Answer types in an event's registration form, as the admin sees them.
+QUESTION_KINDS = {
+    'short': 'Short answer', 'long': 'Paragraph', 'single': 'Multiple choice (one answer)',
+    'multiple': 'Checkboxes (several answers)', 'dropdown': 'Dropdown', 'date': 'Date', 'number': 'Number',
+}
+CHOICE_KINDS = ('single', 'multiple', 'dropdown')
+
 # Choices on the member profile page. The API serves these to the form, so this is the only list.
 GENDERS = {'female': 'Qadın', 'male': 'Kişi', 'other': 'Digər', 'undisclosed': 'Bildirmək istəmirəm'}
 OCCUPATIONS = {
@@ -74,6 +81,10 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(150), unique=True, nullable=True)
     phone = db.Column(db.String(30), nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow)
+    email_verified_at = db.Column(db.DateTime, nullable=True)
+    email_verification_sent_at = db.Column(db.DateTime, nullable=True)
+    # Set when the account is deleted. The empty row stays: see services/accounts.py.
+    deleted_at = db.Column(db.DateTime, nullable=True)
 
     # IYDP team: gets the "Member" card, set by an admin.
     is_staff_member = db.Column(db.Boolean, default=False, nullable=False)
@@ -95,7 +106,11 @@ class User(UserMixin, db.Model):
         foreign_keys='Attendance.user_id', cascade='all, delete-orphan'
     )
     applications = db.relationship('Application', backref='user', lazy=True, cascade='all, delete-orphan')
-    event_registrations = db.relationship('EventRegistration', backref='user', lazy=True, cascade='all, delete-orphan')
+    event_registrations = db.relationship(
+        'EventRegistration', backref='user', lazy=True,
+        foreign_keys='EventRegistration.user_id', cascade='all, delete-orphan'
+    )
+    notifications = db.relationship('Notification', backref='user', lazy=True, cascade='all, delete-orphan')
     profile = db.relationship('MemberProfile', backref='user', uselist=False, cascade='all, delete-orphan')
 
     def get_id(self):
@@ -245,6 +260,11 @@ class Opportunity(db.Model):
     )
     tags = db.relationship('OpportunityTag', backref='opportunity', lazy=True, cascade='all, delete-orphan')
     applications = db.relationship('Application', backref='opportunity', lazy=True, cascade='all, delete-orphan')
+    questions = db.relationship(
+        'ProjectQuestion', backref='opportunity', lazy=True,
+        order_by='ProjectQuestion.position', cascade='all, delete-orphan'
+    )
+    notifications = db.relationship('Notification', backref='opportunity', lazy=True, cascade='all, delete-orphan')
 
     def __init__(self, **kwargs):
         super(Opportunity, self).__init__(**kwargs)
@@ -258,6 +278,10 @@ class Opportunity(db.Model):
         if self.end_date and self.end_date < az_now_naive().date():
             return 'finished'
         return 'present'
+
+    @property
+    def has_form(self):
+        return bool(self.questions)
 
     @property
     def deadline_passed(self):
@@ -300,6 +324,10 @@ class Application(db.Model):
     motivation = db.Column(db.Text, nullable=True)
     cv_link = db.Column(db.String(500), nullable=True)
     admin_note = db.Column(db.Text, nullable=True)
+    # With a project's own form: a copy of each question with its answer.
+    answers = db.Column(db.JSON, nullable=True)
+    decision_note = db.Column(db.Text, nullable=True)  # sent to the applicant
+    email_status = db.Column(db.String(10), nullable=True)  # sent | failed | off | none
 
     __table_args__ = (
         db.UniqueConstraint('user_id', 'opportunity_id', name='uq_application_user_opportunity'),
@@ -396,6 +424,30 @@ class Event(db.Model):
         'EventRegistration', backref='event', lazy=True,
         order_by='EventRegistration.created_at', cascade='all, delete-orphan'
     )
+    questions = db.relationship(
+        'EventQuestion', backref='event', lazy=True,
+        order_by='EventQuestion.position', cascade='all, delete-orphan'
+    )
+    notifications = db.relationship('Notification', backref='event', lazy=True, cascade='all, delete-orphan')
+
+    @property
+    def has_form(self):
+        return bool(self.questions)
+
+    def _count(self, status):
+        return sum(r.status == status for r in self.registrations)
+
+    @property
+    def pending_count(self):
+        return self._count('pending')
+
+    @property
+    def approved_count(self):
+        return self._count('approved')
+
+    @property
+    def rejected_count(self):
+        return self._count('rejected')
 
     @property
     def has_started(self):
@@ -405,11 +457,31 @@ class Event(db.Model):
     def spots_left(self):
         if self.capacity is None:
             return None
-        return max(self.capacity - len(self.registrations), 0)
+        # Only an admin's approval takes a seat.
+        return max(self.capacity - self.approved_count, 0)
 
     @property
     def registration_open(self):
-        return self.is_public and not self.has_started and self.spots_left != 0
+        return self.is_public and self.has_form and not self.has_started and self.spots_left != 0
+
+
+class FormQuestion:
+    """One question of an admin-built form, for events and projects alike."""
+    id = db.Column(db.Integer, primary_key=True)
+    position = db.Column(db.Integer, default=0, nullable=False)
+    label = db.Column(db.String(300), nullable=False)
+    help_text = db.Column(db.String(500), nullable=True)
+    kind = db.Column(db.String(20), nullable=False)
+    required = db.Column(db.Boolean, default=True, nullable=False)
+    options = db.Column(db.JSON, nullable=True)
+
+
+class EventQuestion(FormQuestion, db.Model):
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False, index=True)
+
+
+class ProjectQuestion(FormQuestion, db.Model):
+    opportunity_id = db.Column(db.Integer, db.ForeignKey('opportunity.id'), nullable=False, index=True)
 
 
 class EventRegistration(db.Model):
@@ -417,10 +489,31 @@ class EventRegistration(db.Model):
     event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=utcnow)
+    status = db.Column(db.String(20), default='pending', nullable=False, index=True)  # pending | approved | rejected
+    # A copy of each question with its answer, so later form edits never change what was said.
+    answers = db.Column(db.JSON, nullable=True)
+    decision_note = db.Column(db.Text, nullable=True)  # sent to the applicant
+    decided_at = db.Column(db.DateTime, nullable=True)
+    decided_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    email_status = db.Column(db.String(10), nullable=True)  # sent | failed | off | none
+
+    decided_by = db.relationship('User', foreign_keys=[decided_by_id])
 
     __table_args__ = (
         db.UniqueConstraint('event_id', 'user_id', name='uq_event_registration_event_user'),
     )
+
+
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=True, index=True)
+    opportunity_id = db.Column(db.Integer, db.ForeignKey('opportunity.id'), nullable=True, index=True)
+    title = db.Column(db.String(300), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    link = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow)
+    read_at = db.Column(db.DateTime, nullable=True)
 
 
 class Attendance(db.Model):

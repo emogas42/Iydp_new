@@ -53,7 +53,7 @@ const FAQSection = () => {
                     className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
                       isOpen
                         ? 'bg-primary-500 text-white'
-                        : 'bg-slate-100 text-slate-400'
+                        : 'bg-slate-100 text-slate-500'
                     }`}
                   >
                     {isOpen ? (

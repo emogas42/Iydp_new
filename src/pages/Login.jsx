@@ -66,7 +66,12 @@ const Login = () => {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Şifrə</label>
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <label className="text-xs font-semibold text-slate-700">Şifrə</label>
+                <Link to="/forgot-password" className="text-xs font-semibold text-primary-500 hover:underline">
+                  Şifrəni unutmusunuz?
+                </Link>
+              </div>
               <input
                 type="password"
                 required

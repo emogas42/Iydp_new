@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { usePageTitle } from '@/components/layout/PageTitle'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Calendar, Clock, ImageOff, MapPin } from 'lucide-react'
@@ -7,6 +8,8 @@ import { RichText } from '@/components/ui/RichText'
 import { Gallery } from '@/components/gallery/Gallery'
 import { Lightbox } from '@/components/gallery/Lightbox'
 import { ApplicationForm } from '@/components/projects/ApplicationForm'
+import { QuestionForm } from '@/components/forms/QuestionForm'
+import { VerifyEmailNotice } from '@/components/account/VerifyEmailNotice'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/utils/api'
 import { formatDate, formatRange } from '@/utils/format'
@@ -24,10 +27,10 @@ const Fact = ({ icon: Icon, label, value }) =>
   value ? (
     <div className="flex items-start gap-3">
       <Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary-600" strokeWidth={1.75} />
-      <div>
+      <dl>
         <dt className="text-sm text-slate-500">{label}</dt>
         <dd className="font-medium text-slate-900">{value}</dd>
-      </div>
+      </dl>
     </div>
   ) : null
 
@@ -40,6 +43,7 @@ const ApplySection = ({ project, onApplied }) => {
       <div className="rounded-lg border border-slate-200 bg-white p-5 sm:p-7">
         <p className="font-semibold text-slate-900">You applied on {formatDate(project.my_application.applied_at)}.</p>
         <p className="mt-1 text-slate-600">Status: {STATUS_LABELS[project.my_application.status] || project.my_application.status}. You can follow it on your <Link to="/account" className="font-medium text-primary-700 underline underline-offset-4">account page</Link>.</p>
+        {project.my_application.note && <p className="mt-3 whitespace-pre-line rounded-md bg-slate-50 p-3 text-slate-700">{project.my_application.note}</p>}
       </div>
     )
   }
@@ -64,6 +68,7 @@ const ApplySection = ({ project, onApplied }) => {
       </div>
     )
   }
+  if (user.email_verification_required) return <VerifyEmailNotice />
   if (project.requires_profile && !user.profile_complete) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-5 sm:p-7">
@@ -75,6 +80,16 @@ const ApplySection = ({ project, onApplied }) => {
       </div>
     )
   }
+  if (project.has_form) {
+    return (
+      <QuestionForm
+        questions={project.questions}
+        submit={(answers) => api.applyToProject(project.id, { answers })}
+        onSubmitted={(data) => onApplied(data.my_application)}
+        note="The team reviews each application and lets you know."
+      />
+    )
+  }
   return <ApplicationForm projectId={project.id} user={user} onSubmitted={onApplied} />
 }
 
@@ -83,6 +98,7 @@ const ProjectDetail = () => {
   const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const [project, setProject] = useState(null)
+  usePageTitle(project?.title)
   const [loading, setLoading] = useState(true)
   const [posterOpen, setPosterOpen] = useState(null)
   const loggedIn = Boolean(user)
@@ -148,7 +164,7 @@ const ProjectDetail = () => {
           <motion.nav aria-label="Breadcrumb" {...fadeUp(0)}>
             <ol className="flex flex-wrap items-center gap-1.5 text-sm">
               <li><Link to="/" className="text-slate-500 transition-colors hover:text-primary-600">Home</Link></li>
-              <li aria-hidden="true" className="text-slate-400">/</li>
+              <li aria-hidden="true" className="text-slate-500">/</li>
               <li><Link to={listUrl} className="text-slate-500 transition-colors hover:text-primary-600">{finished ? 'Finished Projects' : 'Present Projects'}</Link></li>
             </ol>
           </motion.nav>
@@ -174,11 +190,11 @@ const ProjectDetail = () => {
                 {project.title}
               </motion.h1>
 
-              <motion.dl {...fadeUp(0.18)} className="mt-7 grid gap-5 sm:grid-cols-2">
+              <motion.div {...fadeUp(0.18)} className="mt-7 grid gap-5 sm:grid-cols-2">
                 <Fact icon={MapPin} label="Location" value={project.location} />
                 <Fact icon={Calendar} label="Project dates" value={formatRange(project.start_date, project.end_date)} />
                 {!finished && <Fact icon={Clock} label="Application deadline" value={formatDate(project.deadline)} />}
-              </motion.dl>
+              </motion.div>
 
               {project.tags?.length > 0 && (
                 <motion.p {...fadeUp(0.22)} className="mt-6 text-sm text-slate-500">{project.tags.join(' · ')}</motion.p>

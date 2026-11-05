@@ -14,10 +14,12 @@ export default {
           200: '#99dffb',
           300: '#66cff9',
           400: '#33bff7',
-          500: '#00aef6',
-          600: '#008cc5',
-          700: '#006994',
-          800: '#004662',
+          // 500 and darker pass WCAG AA with white, also on the palest tints. The logo's own
+          // blue, #00aef6, is 2.4:1 on white, too faint for text and buttons.
+          500: '#006fa9',
+          600: '#005f91',
+          700: '#00507b',
+          800: '#004062',
           900: '#002331',
         },
         // Secondary – IYDP Purple

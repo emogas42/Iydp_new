@@ -18,12 +18,27 @@ async function post(url, body) {
   if (!res.ok) {
     const error = new Error(data.error || 'Something went wrong. Please try again.')
     error.status = res.status
+    error.code = data.code
+    error.errors = data.errors
     throw error
   }
   return data
 }
 
 export const api = {
+  // Forgotten password
+  forgotPassword: (email) => post(`${API}/auth/forgot-password`, { email }),
+  resetPassword: (form) => post(`${API}/auth/reset-password`, form),
+
+  // Email confirmation
+  verifyEmail: (token) => post(`${API}/auth/verify-email`, { token }),
+  resendVerification: () => post(`${API}/account/verify-email/resend`),
+  changeEmail: (form) => post(`${API}/account/email`, form),
+  deleteAccount: (password) => post(`${API}/account/delete`, { password }),
+
+  // Notifications
+  markNotificationsRead: () => post(`${API}/account/notifications/read`),
+
   // Member profile
   getProfile: () => request(`${API}/account/profile`),
   saveProfile: (form) => post(`${API}/account/profile`, form),
@@ -39,7 +54,7 @@ export const api = {
   // Events
   getEvents: (params = '') => request(`${API}/events?${params}`),
   getEvent: (id) => request(`${API}/events/${id}`),
-  registerForEvent: (id) => post(`${API}/events/${id}/register`),
+  registerForEvent: (id, answers) => post(`${API}/events/${id}/register`, { answers }),
   unregisterFromEvent: (id) => post(`${API}/events/${id}/unregister`),
 
   // News

@@ -1,9 +1,11 @@
 import csv
 import html
 import io
+import json
 import os
 import re
 import secrets
+import time
 from datetime import date, datetime, timezone, timedelta
 from functools import wraps
 
@@ -15,6 +17,7 @@ from flask import (
     Flask, render_template, request, redirect, url_for, flash, session,
     jsonify, abort, Response, send_from_directory
 )
+from flask.sessions import SecureCookieSessionInterface
 from flask_login import (
     LoginManager, login_user, login_required, current_user, logout_user
 )
@@ -23,6 +26,7 @@ from flask_wtf import CSRFProtect
 from flask_wtf.csrf import generate_csrf
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -33,16 +37,30 @@ from models import (
     db, User, ContactMessage, Opportunity, OpportunityTag, OpportunityPhoto, Application,
     News, Story, StoryPhoto, Payment, Event, EventRegistration, Attendance,
     MemberProfile, ProfileEducation, ProfileExperience, ProfileLanguage,
+    Notification, EventQuestion, ProjectQuestion, QUESTION_KINDS, utcnow,
     GENDERS, OCCUPATIONS, EDUCATION_LEVELS, EXPERIENCE_KINDS, LANGUAGE_LEVELS, INTERESTS,
     az_now_naive,
 )
 from services import vip as vip_service
 from services import checkin as checkin_service
 from services import uploads as upload_service
+from services import mail as mail_service
+from services import registrations as registration_service
+from services import accounts
+from services import email_verification as verification
+from services import password_reset
+from services import bot_check
+from services import seo
 
 load_dotenv()
 
 app = Flask(__name__)
+
+# Behind nginx or Cloudflare every request seems to come from the proxy, so one
+# visitor's failed logins would use up the rate limit for everyone.
+_proxy_hops = int(os.environ.get('TRUSTED_PROXY_HOPS', '0'))
+if _proxy_hops:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=_proxy_hops, x_proto=1)
 
 _secret_key = os.environ.get('SECRET_KEY')
 if not _secret_key:
@@ -70,9 +88,38 @@ app.config['MAX_CONTENT_LENGTH'] = 80 * 1024 * 1024
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', '1') == '1'
+# A signed-in member stays signed in while they keep coming back, and no longer. This also
+# limits how long a copied cookie works, since sessions live in the cookie.
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=14)
+ADMIN_IDLE_SECONDS = 2 * 60 * 60
+# The token already belongs to the session. With the default one-hour limit, any form left
+# open for an hour failed when sent.
+app.config['WTF_CSRF_TIME_LIMIT'] = None
+ASSET_PREFIXES = ('/assets/', '/static/', '/images/')
+
+
+class AssetAwareSessionInterface(SecureCookieSessionInterface):
+    def should_set_cookie(self, app, session):
+        # Files that caches may keep must never carry someone's session cookie.
+        return not request.path.startswith(ASSET_PREFIXES) and super().should_set_cookie(app, session)
+
+
+app.session_interface = AssetAwareSessionInterface()
 
 db.init_app(app)
 migrate = Migrate(app, db)
+
+
+# What pages may load. React and framer-motion set inline styles, so those stay allowed.
+_CSP_COMMON = (
+    "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; "
+    "base-uri 'self'; form-action 'self'; frame-ancestors 'none'; "
+)
+SITE_CSP = _CSP_COMMON + "script-src 'self'; img-src 'self' data: https:"
+# The admin templates use inline scripts and handlers. All of their output is escaped by
+# Jinja, and scripts can still only load from this site. The scanner shows the camera as blob:.
+ADMIN_CSP = _CSP_COMMON + "script-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:"
 
 
 @app.after_request
@@ -80,6 +127,14 @@ def set_security_headers(response):
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')
     response.headers.setdefault('X-Frame-Options', 'DENY')  # blocks clickjacking of the admin panel
     response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.setdefault('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), payment=()')
+    if response.mimetype == 'text/html':
+        response.headers.setdefault('Content-Security-Policy', ADMIN_CSP if request.path.startswith('/admin') else SITE_CSP)
+    # Only over HTTPS. Browsers then refuse plain http for this domain, not its subdomains.
+    if request.is_secure:
+        response.headers.setdefault('Strict-Transport-Security', 'max-age=15552000')
+    if request.path.startswith(('/admin', '/api/')):
+        response.headers.setdefault('X-Robots-Tag', 'noindex')
     # Member data must not be left in a shared computer's browser cache.
     if request.path.startswith(('/admin', '/api/account', '/api/auth')):
         response.headers['Cache-Control'] = 'no-store'
@@ -104,11 +159,75 @@ def unauthorized():
 DIST_DIR = os.path.join(app.root_path, 'dist')
 
 
+def _site_url():
+    return os.environ.get('SITE_URL') or request.url_root
+
+
+def _detail_page(path):
+    """(title, description, image) for a page about one item, or None if it isn't public."""
+    kind, _, key = path.strip('/').partition('/')
+    if kind == 'stories':
+        story = Story.query.filter_by(slug=key, is_published=True).first()
+        return story and (story.title, seo.description_from(story.content), story.avatar_path)
+    if not re.fullmatch(r'\d{1,9}', key):
+        return None
+    if kind == 'news':
+        item = News.query.filter_by(id=int(key), is_published=True).first()
+        return item and (item.title, seo.description_from(item.content), item.image_url)
+    if kind == 'projects':
+        item = Opportunity.query.filter_by(id=int(key), is_active=True).first()
+        return item and (item.title, seo.description_from(item.description), item.poster_path)
+    if kind == 'events':
+        item = Event.query.filter_by(id=int(key), is_public=True).first()
+        return item and (item.name, seo.description_from(item.description), item.poster_path)
+    return None
+
+
 def serve_spa():
     index_path = os.path.join(DIST_DIR, 'index.html')
-    if os.path.isfile(index_path):
-        return send_from_directory(DIST_DIR, 'index.html')
-    abort(404)
+    if not os.path.isfile(index_path):
+        abort(404)
+
+    path = request.path.rstrip('/') or '/'
+    status, image, noindex = 200, None, False
+    if path in seo.PUBLIC_PAGES:
+        title, description = seo.PUBLIC_PAGES[path]
+    elif path in seo.PRIVATE_PAGES:
+        title, description, noindex = seo.PRIVATE_PAGES[path], seo.DEFAULT_DESCRIPTION, True
+    else:
+        detail = _detail_page(path) if path.startswith(('/news/', '/projects/', '/events/', '/stories/')) else None
+        if detail:
+            title, description, image = detail
+        else:
+            # React shows its own page, and search engines are told it isn't a real address.
+            title, description, status, noindex = seo.NOT_FOUND_TITLE, seo.DEFAULT_DESCRIPTION, 404, True
+
+    with open(index_path, encoding='utf-8') as f:
+        page = seo.render(f.read(), _site_url(), path, title, description, image, noindex)
+    return Response(page, status=status, mimetype='text/html', headers={'Cache-Control': 'no-cache'})
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    lines = ['User-agent: *'] + [f'Disallow: {p}' for p in ('/admin', '/api/', '/account', '/forgot-password', '/reset-password', '/verify-email')]
+    lines += ['', f"Sitemap: {seo.absolute_url(_site_url(), 'sitemap.xml')}"]
+    return Response('\n'.join(lines) + '\n', mimetype='text/plain', headers={'Cache-Control': 'public, max-age=3600'})
+
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    site = _site_url()
+    urls = [(seo.absolute_url(site, p.lstrip('/')), None) for p in seo.PUBLIC_PAGES if p not in ('/login', '/register')]
+    urls += [(seo.absolute_url(site, f'news/{n.id}'), n.updated_at) for n in News.query.filter_by(is_published=True)]
+    urls += [(seo.absolute_url(site, f'projects/{o.id}'), None) for o in Opportunity.query.filter_by(is_active=True)]
+    urls += [(seo.absolute_url(site, f'events/{e.id}'), None) for e in Event.query.filter_by(is_public=True)]
+    urls += [(seo.absolute_url(site, f'stories/{s.slug}'), None) for s in Story.query.filter_by(is_published=True)]
+    return Response(seo.sitemap(urls), mimetype='application/xml', headers={'Cache-Control': 'public, max-age=3600'})
+
+
+@app.route('/favicon.ico')
+def favicon():
+    return redirect('/logo.png', code=301)
 
 
 AZERBAIJAN_TZ = timezone(timedelta(hours=4))
@@ -173,15 +292,34 @@ def inject_admin_counters():
             # Views may still pass their own value; this is the fallback for the nav badge.
             'unread_count': ContactMessage.query.filter_by(is_read=False).count(),
             'pending_applications_count': Application.query.filter_by(status='pending').count(),
+            'pending_registrations_count': EventRegistration.query.filter_by(status='pending').count(),
         }
     return {}
+
+
+@app.before_request
+def apply_session_limits():
+    if request.path.startswith(ASSET_PREFIXES):
+        return
+    if not current_user.is_authenticated or not current_user.is_admin:
+        session.permanent = True
+        return
+    # An admin's session ends with the browser, or after two hours away from it.
+    session.permanent = False
+    now = time.time()
+    if now - session.get('admin_seen', now) > ADMIN_IDLE_SECONDS:
+        logout_user()
+        session.pop('admin_seen', None)
+        flash('Signed out after two hours without activity.', 'info')
+    else:
+        session['admin_seen'] = now
 
 
 @login_manager.user_loader
 def load_user(session_id):
     user_id, _, version = session_id.partition('.')
     user = db.session.get(User, int(user_id))
-    if user and str(user.session_version) == version:
+    if user and not user.deleted_at and str(user.session_version) == version:
         return user
     return None
 
@@ -244,47 +382,8 @@ def get_news_album_images(keyword_image):
 def home():
     return serve_spa()
 
-@app.route('/contact', methods=['GET', 'POST'])
-@limiter.limit('5 per minute', methods=['POST'])
+@app.route('/contact')
 def contact():
-    if request.method == 'POST':
-        raw_name = request.form.get('name', '')[:150]
-        raw_email = request.form.get('email', '')[:150]
-        raw_message = request.form.get('message', '')[:5000]
-
-        if not all([raw_name, raw_email, raw_message]):
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'status': 'error', 'message': 'Please fill in all fields.'}), 400
-            flash('Please fill in all fields.', 'danger')
-            return redirect(request.referrer or url_for('home'))
-
-        clean_name = html.escape(raw_name)
-        clean_email = html.escape(raw_email)
-        clean_message = html.escape(raw_message)
-
-        new_message = ContactMessage(
-            name=clean_name,
-            email=clean_email,
-            message=clean_message
-        )
-
-        try:
-            db.session.add(new_message)
-            db.session.commit()
-
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'status': 'success', 'message': 'Message sent successfully!'}), 200
-
-            flash('Message sent successfully!', 'success')
-            return redirect((request.referrer or url_for('home')) + '#contact')
-
-        except Exception as e:
-            db.session.rollback()
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'status': 'error', 'message': 'Database error.'}), 500
-            flash('An error occurred.', 'danger')
-            return redirect(request.referrer or url_for('home'))
-
     return serve_spa()
 
 # ══════════════════════════════════════════════════════════════
@@ -301,8 +400,12 @@ def user_to_dict(u):
         'phone': u.phone,
         'is_admin': u.is_admin,
         'must_change_password': u.must_change_password,
+        'email_verified': bool(u.email_verified_at),
+        'email_verification_required': verification.is_required(u),
+        'verification_sent_at': u.email_verification_sent_at.isoformat() if u.email_verification_sent_at else None,
         'profile_progress': u.profile_progress,
         'profile_complete': u.profile_complete,
+        'unread_notifications': Notification.query.filter_by(user_id=u.id, read_at=None).count(),
         'is_vip': u.is_vip,
         'vip_status': u.vip_status,
         'card_type': u.card_type,
@@ -318,13 +421,41 @@ def api_csrf_token():
     return jsonify({'csrf_token': generate_csrf()})
 
 
+def _username_for(email):
+    if User.query.filter_by(username=email).first():
+        return f'{email}.{secrets.token_hex(3)}'
+    return email
+
+
+def verified_email_required(view):
+    """For actions that reach the team. Goes under login_required."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if verification.is_required(current_user):
+            return jsonify({'error': 'Əvvəlcə email ünvanınızı təsdiqləyin.', 'code': 'email_not_verified'}), 403
+        return view(*args, **kwargs)
+    return wrapped
+
+
+@app.route('/api/form-token')
+def api_form_token():
+    response = jsonify({'token': bot_check.make_token()})
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
 @app.route('/api/auth/register', methods=['POST'])
 @limiter.limit('5 per minute')
+# Every sign-up sends a mail to the address given, so this also protects the domain's
+# reputation. High enough for a room of participants signing up from one network.
+@limiter.limit('60 per hour')
 def api_register():
     if current_user.is_authenticated:
         return jsonify({'error': 'already_authenticated'}), 400
 
     data = request.get_json(silent=True) or request.form
+    if bot_check.problem(data):
+        return jsonify({'error': 'Bir az gözləyib yenidən cəhd edin.', 'code': 'form_check'}), 400
     full_name = (data.get('full_name') or '').strip()
     email = (data.get('email') or '').strip().lower()
     phone = (data.get('phone') or '').strip()
@@ -342,18 +473,19 @@ def api_register():
         errors.append('Şifrə ən azı 8 simvoldan ibarət olmalıdır.')
     if password != confirm_password:
         errors.append('Şifrələr uyğun gəlmir.')
-    if email and User.query.filter_by(email=email).first():
+    existing = User.query.filter_by(email=email).first() if email else None
+    if existing and not verification.is_abandoned(existing):
         errors.append('Bu email ilə artıq qeydiyyatdan keçilib.')
 
     if errors:
         return jsonify({'error': errors[0], 'errors': errors}), 400
 
-    username = email
-    if User.query.filter_by(username=username).first():
-        username = f'{email}.{secrets.token_hex(3)}'
+    if existing:
+        accounts.erase(existing)
+        db.session.flush()
 
     member = User(
-        username=username,
+        username=_username_for(email),
         email=email,
         full_name=full_name,
         phone=phone,
@@ -363,6 +495,10 @@ def api_register():
     db.session.add(member)
     db.session.flush()
     member.ensure_card()
+    db.session.commit()
+
+    # A failed send doesn't stop the sign-up: the account page offers to send it again.
+    verification.send_link(member)
     db.session.commit()
 
     login_user(member)
@@ -385,6 +521,137 @@ def api_login():
         return jsonify({'user': user_to_dict(member)})
 
     return jsonify({'error': 'Email və ya şifrə yanlışdır.'}), 401
+
+
+def _reset_address_limit_key():
+    data = request.get_json(silent=True)
+    address = data.get('email') if isinstance(data, dict) else ''
+    return f'reset:{str(address or "").strip().lower()[:150]}'
+
+
+@app.route('/api/auth/forgot-password', methods=['POST'])
+@limiter.limit('5 per minute')
+# Stops the form being used to flood someone's mailbox. Counts every address alike,
+# so being limited says nothing about whether an account exists.
+@limiter.limit('5 per hour', key_func=_reset_address_limit_key)
+def api_forgot_password():
+    if not verification.is_enabled():
+        return jsonify({'error': 'Hazırda məktub göndərilə bilmir. Bizimlə əlaqə saxlayın.', 'code': 'mail_off'}), 503
+    data = request.get_json(silent=True)
+    email = data.get('email') if isinstance(data, dict) else None
+    email = email.strip().lower() if isinstance(email, str) else ''
+    if not EMAIL_RE.match(email) or len(email) > 150:
+        return jsonify({'error': 'Düzgün email ünvanı daxil edin.'}), 400
+    member = User.query.filter_by(email=email).first()
+    if password_reset.can_reset(member):
+        password_reset.send_link(member)
+    # The same answer either way, so nobody can test whether an address has an account.
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+@limiter.limit('10 per minute')
+def api_reset_password():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
+    token_data, failure = password_reset.read_token(data.get('token'))
+    if failure:
+        return jsonify({'error': 'Link işləmir.', 'code': failure}), 400
+    member = db.session.get(User, token_data.get('user'))
+    if not password_reset.can_reset(member) or not password_reset.token_matches(token_data, member):
+        return jsonify({'error': 'Link işləmir.', 'code': 'invalid'}), 400
+
+    password = data.get('password')
+    if not isinstance(password, str) or len(password) < 8:
+        return jsonify({'error': 'Şifrə ən azı 8 simvoldan ibarət olmalıdır.'}), 400
+    if password != data.get('confirm_password'):
+        return jsonify({'error': 'Şifrələr uyğun gəlmir.'}), 400
+
+    # Also signs out every device, which removes anyone who got in with the old password.
+    member.set_password_hash(generate_password_hash(password))
+    member.must_change_password = False
+    # Opening a link sent to this address proves the member owns it.
+    if not member.email_verified_at:
+        verification.mark_verified(member)
+    db.session.commit()
+    return jsonify({'status': 'ok'})
+
+
+def _account_limit_key():
+    return current_user.get_id() or get_remote_address()
+
+
+@app.route('/api/auth/verify-email', methods=['POST'])
+@limiter.limit('30 per minute')
+def api_verify_email():
+    data, failure = verification.read_token((request.get_json(silent=True) or {}).get('token'))
+    if failure:
+        return jsonify({'error': 'Link işləmir.', 'code': failure}), 400
+    # Signing in proves the password too. Otherwise someone could open an account with
+    # another person's address, and that person's click would confirm it for them.
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Daxil olun.', 'code': 'login_required'}), 401
+    if data.get('user') != current_user.id:
+        return jsonify({'error': 'Bu link başqa hesab üçündür.', 'code': 'wrong_account'}), 403
+    if not verification.token_matches(data, current_user):
+        return jsonify({'error': 'Link işləmir.', 'code': 'invalid'}), 400
+    if not current_user.email_verified_at:
+        verification.mark_verified(current_user)
+        db.session.commit()
+    return jsonify({'user': user_to_dict(current_user)})
+
+
+@app.route('/api/account/verify-email/resend', methods=['POST'])
+@login_required
+@limiter.limit('10 per hour', key_func=_account_limit_key)
+def api_resend_verification():
+    if not verification.is_required(current_user):
+        return jsonify({'user': user_to_dict(current_user)})
+    wait = verification.seconds_until_resend(current_user)
+    if wait:
+        return jsonify({'error': f'Yeni link üçün {wait} saniyə gözləyin.'}), 429
+    if not verification.send_link(current_user):
+        return jsonify({'error': 'Məktub göndərilmədi. Bir az sonra yenidən cəhd edin.'}), 502
+    db.session.commit()
+    return jsonify({'user': user_to_dict(current_user)})
+
+
+@app.route('/api/account/email', methods=['POST'])
+@login_required
+@limiter.limit('5 per minute')
+def api_change_unconfirmed_email():
+    # Only for fixing a typo. Changing a confirmed address would need its own checks.
+    if current_user.email_verified_at or current_user.is_admin:
+        return jsonify({'error': 'Təsdiqlənmiş email burada dəyişdirilə bilməz.'}), 400
+
+    data = request.get_json(silent=True) or {}
+    email = str(data.get('email') or '').strip().lower()
+    if not check_password_hash(current_user.password, str(data.get('password') or '')):
+        return jsonify({'error': 'Şifrə yanlışdır.'}), 400
+    if not EMAIL_RE.match(email) or len(email) > 150:
+        return jsonify({'error': 'Düzgün email ünvanı daxil edin.'}), 400
+    if email == current_user.email:
+        return jsonify({'error': 'Hesabınızda artıq bu email var.'}), 400
+
+    existing = User.query.filter_by(email=email).first()
+    if existing and not verification.is_abandoned(existing):
+        return jsonify({'error': 'Bu email ilə artıq qeydiyyatdan keçilib.'}), 400
+    if existing:
+        accounts.erase(existing)
+        db.session.flush()
+
+    if current_user.username == current_user.email:
+        current_user.username = _username_for(email)
+    current_user.email = email
+    current_user.email_verification_sent_at = None
+    db.session.commit()
+
+    sent = verification.send_link(current_user)
+    db.session.commit()
+    if not sent:
+        return jsonify({'error': 'Email dəyişdirildi, amma məktub göndərilmədi. Linki yenidən istəyin.'}), 502
+    return jsonify({'user': user_to_dict(current_user)})
 
 
 @app.route('/api/auth/logout', methods=['POST'])
@@ -423,6 +690,14 @@ def api_account():
             'event_name': a.event.name,
             'checked_in_at': a.checked_in_at.isoformat() if a.checked_in_at else None,
         } for a in attendances],
+        'notifications': [{
+            'id': n.id,
+            'title': n.title,
+            'body': n.body,
+            'link': n.link,
+            'is_read': n.read_at is not None,
+            'created_at': n.created_at.isoformat() if n.created_at else None,
+        } for n in Notification.query.filter_by(user_id=current_user.id).order_by(Notification.id.desc()).limit(20)],
         'applications': [{
             'id': a.id,
             'project_id': a.opportunity_id,
@@ -435,8 +710,33 @@ def api_account():
             'event_id': r.event_id,
             'event_name': r.event.name,
             'starts_at': r.event.starts_at.isoformat() if r.event.starts_at else None,
+            'status': r.status,
         } for r in sorted(current_user.event_registrations, key=lambda r: r.id, reverse=True) if r.event.is_public],
     })
+
+
+@app.route('/api/account/notifications/read', methods=['POST'])
+@login_required
+def api_notifications_read():
+    Notification.query.filter_by(user_id=current_user.id, read_at=None).update({'read_at': utcnow()})
+    db.session.commit()
+    return jsonify({'user': user_to_dict(current_user)})
+
+
+@app.route('/api/account/delete', methods=['POST'])
+@login_required
+@limiter.limit('5 per minute')
+def api_delete_account():
+    # Admin accounts stay: the panel would have nobody left to run it.
+    if current_user.is_admin:
+        return jsonify({'error': 'Admin hesabı burada silinə bilməz.'}), 403
+    password = str((request.get_json(silent=True) or {}).get('password') or '')
+    if not check_password_hash(current_user.password, password):
+        return jsonify({'error': 'Şifrə yanlışdır.'}), 400
+    accounts.erase(current_user._get_current_object())
+    db.session.commit()
+    logout_user()
+    return jsonify({'status': 'ok'})
 
 
 @app.route('/api/account/password', methods=['POST'])
@@ -618,6 +918,7 @@ def api_save_profile():
 
 @app.route('/api/vip/request', methods=['POST'])
 @login_required
+@verified_email_required
 def api_request_vip():
     if current_user.is_staff_member:
         return jsonify({'error': 'Komanda üzvlərinin artıq Member kartı var.'}), 400
@@ -677,6 +978,10 @@ def login():
 @app.route('/admin/logout')
 @login_required
 def logout():
+    # Sessions live in the cookie, so signing out alone would leave a copied one working.
+    if current_user.is_admin:
+        current_user.session_version = (current_user.session_version or 0) + 1
+        db.session.commit()
     logout_user()
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
@@ -690,13 +995,17 @@ def admin_dashboard():
     total_news_count = News.query.count()
     unread_count = ContactMessage.query.filter_by(is_read=False).count()
 
-    total_members = User.query.filter_by(is_admin=False).count()
+    total_members = User.query.filter_by(is_admin=False, deleted_at=None).count()
     total_vip = User.query.filter_by(is_vip=True, vip_status='active').count()
     pending_vip = Payment.query.filter_by(status='pending').count()
     total_events = Event.query.count()
     pending_applications = Application.query.filter_by(status='pending').count()
+    pending_registrations = EventRegistration.query.filter_by(status='pending').count()
+    first_pending = EventRegistration.query.filter_by(status='pending').order_by(EventRegistration.created_at).first()
 
     return render_template('admin/dashboard.html',
+                         email_verification_on=verification.is_enabled(),
+                         site_url_problem=verification.site_url_problem(),
                          recent_news=recent_news,
                          recent_messages=recent_messages,
                          unread_count=unread_count,
@@ -706,6 +1015,8 @@ def admin_dashboard():
                          total_vip=total_vip,
                          pending_vip=pending_vip,
                          pending_applications=pending_applications,
+                         pending_registrations=pending_registrations,
+                         first_pending_event_id=first_pending.event_id if first_pending else None,
                          total_events=total_events)
 
 @app.route('/admin/settings', methods=['GET', 'POST'])
@@ -955,13 +1266,15 @@ def list_applications():
 @admin_required
 def export_applications():
     query, _, _ = _filtered_applications()
-    rows = [(
+    applications = query.all()
+    columns = _answer_columns(applications)
+    rows = [[
         a.opportunity.title, a.full_name, a.email, a.phone, a.birth_date, a.residence,
         a.english_level, a.motivation, a.cv_link, a.status,
         a.applied_at.strftime('%Y-%m-%d %H:%M') if a.applied_at else '',
-    ) for a in query.all()]
+    ] + _answer_cells(a, columns) for a in applications]
     return _csv_response(
-        ['Project', 'Full name', 'Email', 'Phone', 'Birth date', 'Residence', 'English', 'Motivation', 'CV link', 'Status', 'Applied at (UTC)'],
+        ['Project', 'Full name', 'Email', 'Phone', 'Birth date', 'Residence', 'English', 'Motivation', 'CV link', 'Status', 'Applied at (UTC)'] + list(columns.values()),
         rows, 'applications.csv',
     )
 
@@ -972,11 +1285,21 @@ def view_application(id):
     application = Application.query.get_or_404(id)
     if request.method == 'POST':
         status = request.form.get('status')
+        decided = status in ('accepted', 'rejected') and status != application.status
         if status in APPLICATION_STATUSES:
             application.status = status
         application.admin_note = request.form.get('admin_note', '').strip() or None
+        if decided:
+            application.decision_note = request.form.get('message', '').strip()[:1000] or None
         db.session.commit()
-        flash('Application updated.', 'success')
+        if decided:
+            registration_service.notify_project_decision(application, os.environ.get('SITE_URL') or request.url_root)
+        if decided and application.email_status == 'failed':
+            flash('Decision saved, but the email could not be sent. The applicant can still see it on their account page.', 'error')
+        elif decided:
+            flash('Decision saved. The applicant has been told.', 'success')
+        else:
+            flash('Application updated.', 'success')
         return redirect(url_for('view_application', id=application.id))
     return render_template('admin/applications/detail.html', application=application)
 
@@ -1143,6 +1466,24 @@ def _apply_photo_edits(owner, form, stale):
 def _delete_files(paths):
     for path in paths:
         upload_service.delete_upload(path, app.static_folder, app.static_url_path or '/static')
+
+
+def _answer_columns(records, questions=()):
+    """One CSV column per question, including ones since removed from the form."""
+    columns = {q.id: q.label for q in questions}
+    for record in records:
+        for answer in record.answers or []:
+            columns.setdefault(answer['question_id'], answer['label'])
+    return columns
+
+
+def _answer_cells(record, columns):
+    answers = {a['question_id']: a['value'] for a in (record.answers or [])} if record else {}
+    cells = []
+    for key in columns:
+        value = answers.get(key, '')
+        cells.append('; '.join(value) if isinstance(value, list) else value)
+    return cells
 
 
 def _csv_response(header, rows, filename):
@@ -1325,7 +1666,7 @@ def list_members():
     vip_filter = request.args.get('vip', '')
     unread_count = ContactMessage.query.filter_by(is_read=False).count()
 
-    query = User.query.filter_by(is_admin=False)
+    query = User.query.filter_by(is_admin=False, deleted_at=None)
     if search:
         query = query.filter(
             (User.full_name.ilike(f'%{search}%')) |
@@ -1351,7 +1692,7 @@ def list_members():
 @app.route('/admin/members/<int:id>')
 @admin_required
 def view_member(id):
-    member = User.query.filter_by(id=id, is_admin=False).first_or_404()
+    member = User.query.filter_by(id=id, is_admin=False, deleted_at=None).first_or_404()
     return _render_member_detail(member)
 
 
@@ -1368,12 +1709,39 @@ def _render_member_detail(member, temp_password=None):
                          experience_kinds=EXPERIENCE_KINDS, language_levels=LANGUAGE_LEVELS, interests=INTERESTS)
 
 
+@app.route('/admin/members/<int:id>/verify-email', methods=['POST'])
+@admin_required
+def verify_member_email(id):
+    member = User.query.filter_by(id=id, is_admin=False, deleted_at=None).first_or_404()
+    if not member.email_verified_at:
+        verification.mark_verified(member)
+        db.session.commit()
+        flash('Email marked as confirmed.', 'success')
+    return redirect(url_for('view_member', id=member.id))
+
+
+@app.route('/admin/members/<int:id>/delete', methods=['POST'])
+@admin_required
+@limiter.limit('20 per minute')
+def delete_member(id):
+    # Admin accounts are excluded by the query.
+    member = User.query.filter_by(id=id, is_admin=False, deleted_at=None).first_or_404()
+    if request.form.get('confirm_word', '').strip() != 'DELETE':
+        flash('Account not deleted: type DELETE to confirm.', 'danger')
+        return redirect(url_for('view_member', id=member.id))
+    name = member.display_name
+    accounts.erase(member)
+    db.session.commit()
+    flash(f'{name}: account deleted.', 'success')
+    return redirect(url_for('list_members'))
+
+
 @app.route('/admin/members/<int:id>/reset-password', methods=['POST'])
 @admin_required
 @limiter.limit('20 per minute')
 def reset_member_password(id):
     # Admin accounts are excluded: they change their own password in Settings.
-    member = User.query.filter_by(id=id, is_admin=False).first_or_404()
+    member = User.query.filter_by(id=id, is_admin=False, deleted_at=None).first_or_404()
     temp_password = secrets.token_urlsafe(9)
     member.set_password_hash(generate_password_hash(temp_password))
     member.must_change_password = True
@@ -1385,7 +1753,7 @@ def reset_member_password(id):
 @app.route('/admin/members/<int:id>/vip/activate', methods=['POST'])
 @admin_required
 def activate_member_vip(id):
-    member = User.query.filter_by(id=id, is_admin=False).first_or_404()
+    member = User.query.filter_by(id=id, is_admin=False, deleted_at=None).first_or_404()
     note = request.form.get('note', '').strip() or None
 
     pending_payment = Payment.query.filter_by(user_id=member.id, status='pending').order_by(Payment.created_at.desc()).first()
@@ -1409,7 +1777,7 @@ def activate_member_vip(id):
 @app.route('/admin/members/<int:id>/vip/deactivate', methods=['POST'])
 @admin_required
 def deactivate_member_vip(id):
-    member = User.query.filter_by(id=id, is_admin=False).first_or_404()
+    member = User.query.filter_by(id=id, is_admin=False, deleted_at=None).first_or_404()
     vip_service.revoke_vip(member)
     db.session.commit()
     flash(f'VIP membership deactivated for {member.display_name}.', 'info')
@@ -1419,7 +1787,7 @@ def deactivate_member_vip(id):
 @app.route('/admin/members/<int:id>/vip/regenerate-qr', methods=['POST'])
 @admin_required
 def regenerate_member_qr(id):
-    member = User.query.filter_by(id=id, is_admin=False).first_or_404()
+    member = User.query.filter_by(id=id, is_admin=False, deleted_at=None).first_or_404()
     vip_service.regenerate_qr_token(member)
     db.session.commit()
     flash('A new QR code has been issued. The old card will no longer work.', 'success')
@@ -1429,7 +1797,7 @@ def regenerate_member_qr(id):
 @app.route('/admin/members/<int:id>/staff', methods=['POST'])
 @admin_required
 def set_member_staff(id):
-    member = User.query.filter_by(id=id, is_admin=False).first_or_404()
+    member = User.query.filter_by(id=id, is_admin=False, deleted_at=None).first_or_404()
     member.is_staff_member = request.form.get('is_staff') == '1'
     db.session.commit()
     flash(f'{member.display_name} now has the {member.card_label} card.', 'success')
@@ -1545,8 +1913,11 @@ def add_event():
         db.session.commit()
         for e in upload_errors:
             flash(e, 'error')
-        flash('Event created.', 'success')
-        return redirect(url_for('edit_event', id=event.id) if upload_errors else url_for('list_events'))
+        if upload_errors:
+            flash('Event created.', 'success')
+            return redirect(url_for('edit_event', id=event.id))
+        flash('Event created. Now add the questions people answer to apply.', 'success')
+        return redirect(url_for('event_form', id=event.id))
 
     return render_template('admin/events/form.html', event=None, form={})
 
@@ -1588,12 +1959,11 @@ def delete_event(id):
 
 
 def _event_people(event):
-    """Everyone registered or checked in, as (user, registered_at, checked_in_at) rows."""
+    """Everyone who applied or checked in, as (user, registration, attendance) rows."""
     checked_in = {a.user_id: a for a in event.attendances}
-    people = [(r.user, r.created_at, checked_in.pop(r.user_id).checked_in_at if r.user_id in checked_in else None)
-              for r in event.registrations]
-    # Whoever is left walked in without registering.
-    people += [(a.user, None, a.checked_in_at) for a in checked_in.values()]
+    people = [(r.user, r, checked_in.pop(r.user_id, None)) for r in event.registrations]
+    # Whoever is left walked in without applying.
+    people += [(a.user, None, a) for a in checked_in.values()]
     return people
 
 
@@ -1601,21 +1971,107 @@ def _event_people(event):
 @admin_required
 def event_attendance(id):
     event = Event.query.get_or_404(id)
-    return render_template('admin/events/attendance.html', event=event, people=_event_people(event))
+    status = request.args.get('status', '')
+    people = _event_people(event)
+    shown = [row for row in people if row[1] and row[1].status == status] if status else people
+    return render_template(
+        'admin/events/attendance.html', event=event, people=shown, status=status, all_count=len(people),
+    )
+
+
+def _form_builder(owner, question_class, **page):
+    """The question builder page, shared by events and projects."""
+    if request.method == 'POST':
+        try:
+            submitted = json.loads(request.form.get('questions_json') or '[]')
+        except ValueError:
+            submitted = None
+        rows, errors = registration_service.clean_questions(submitted)
+        if not errors:
+            registration_service.apply_questions(owner, question_class, rows)
+            db.session.commit()
+            flash('Form saved.', 'success')
+            return redirect(request.path)
+        for error in errors:
+            flash(error, 'error')
+        # Keep what they typed.
+        questions = submitted if isinstance(submitted, list) else []
+    else:
+        questions = [{
+            'id': q.id, 'label': q.label, 'help_text': q.help_text, 'kind': q.kind,
+            'required': q.required, 'options': q.options,
+        } for q in owner.questions]
+    return render_template('admin/form_builder.html', questions=questions, kinds=QUESTION_KINDS, **page)
+
+
+@app.route('/admin/events/<int:id>/form', methods=['GET', 'POST'])
+@admin_required
+def event_form(id):
+    event = Event.query.get_or_404(id)
+    return _form_builder(
+        event, EventQuestion, owner_name=event.name,
+        back_url=url_for('event_attendance', id=event.id), back_label='Registered people',
+        view_url=f'/events/{event.id}' if event.is_public else None, has_responses=bool(event.registrations),
+        empty_note='Applications stay closed until this event has at least one question.',
+    )
+
+
+@app.route('/admin/projects/<int:id>/form', methods=['GET', 'POST'])
+@admin_required
+def project_form(id):
+    project = Opportunity.query.get_or_404(id)
+    return _form_builder(
+        project, ProjectQuestion, owner_name=project.title,
+        back_url=url_for('list_applications', project=project.id), back_label='Applications',
+        view_url=f'/projects/{project.id}' if project.is_active else None, has_responses=bool(project.applications),
+        empty_note='Without questions, people see the standard form: date of birth, city, English level, motivation and CV link.',
+    )
+
+
+@app.route('/admin/events/<int:event_id>/registrations/<int:id>', methods=['GET', 'POST'])
+@admin_required
+def event_registration(event_id, id):
+    registration = EventRegistration.query.filter_by(id=id, event_id=event_id).first_or_404()
+    event = registration.event
+    if request.method == 'POST':
+        decision = request.form.get('decision')
+        if decision not in registration_service.DECISIONS:
+            abort(400)
+        note = request.form.get('note', '').strip()[:1000]
+        site_url = os.environ.get('SITE_URL') or request.url_root
+        try:
+            changed = registration_service.decide(registration, decision, note, current_user, site_url)
+        except registration_service.EventFull:
+            flash('All seats are taken. Raise the seat limit or free a seat first.', 'error')
+            return redirect(url_for('event_registration', event_id=event_id, id=id))
+        if changed and registration.email_status == 'failed':
+            flash('Decision saved, but the email could not be sent. The member can still see it on their account page.', 'error')
+        elif changed:
+            flash(f'{"Approved" if decision == "approved" else "Rejected"}. The member has been told.', 'success')
+        return redirect(url_for('event_attendance', id=event_id, status='pending' if event.pending_count else None))
+    return render_template('admin/events/registration.html', event=event, registration=registration)
 
 
 @app.route('/admin/events/<int:id>/attendance/export.csv')
 @admin_required
 def export_event_attendance(id):
     event = Event.query.get_or_404(id)
-    rows = [(
-        u.membership_no, u.card_label, u.full_name, u.email, u.phone,
-        registered.strftime('%Y-%m-%d %H:%M') if registered else '',
-        checked.strftime('%Y-%m-%d %H:%M') if checked else '',
-    ) for u, registered, checked in _event_people(event)]
+    people = _event_people(event)
+
+    columns = _answer_columns([row[1] for row in people if row[1]], event.questions)
+
+    rows = []
+    for u, registration, attendance in people:
+        rows.append([
+            u.membership_no, u.card_label, u.full_name, u.email, u.phone,
+            registration.status if registration else 'walk-in',
+            registration.created_at.strftime('%Y-%m-%d %H:%M') if registration and registration.created_at else '',
+            attendance.checked_in_at.strftime('%Y-%m-%d %H:%M') if attendance and attendance.checked_in_at else '',
+        ] + _answer_cells(registration, columns))
     return _csv_response(
-        ['Membership No', 'Card', 'Full Name', 'Email', 'Phone', 'Registered At (UTC)', 'Checked In At (UTC)'],
-        rows, f'attendance-event-{event.id}.csv',
+        ['Membership No', 'Card', 'Full Name', 'Email', 'Phone', 'Status', 'Applied At (UTC)', 'Checked In At (UTC)']
+        + list(columns.values()),
+        rows, f'event-{event.id}-applications.csv',
     )
 
 
@@ -1638,11 +2094,23 @@ def scanner_checkin():
     if not event:
         return jsonify({'status': 'invalid', 'message': 'No event selected.'}), 400
 
-    status, payload = checkin_service.check_in(event, code, current_user)
+    status, payload = checkin_service.check_in(event, code, current_user, override=data.get('override') is True)
+
+    if status == 'not_approved':
+        db.session.rollback()
+        member, registration = payload
+        reasons = {'pending': 'Application still waiting', 'rejected': 'Application rejected'}
+        return jsonify({
+            'status': status,
+            'name': member.display_name,
+            'membership_no': member.membership_no,
+            'card': member.card_label,
+            'reason': reasons.get(registration.status, 'Not approved') if registration else 'Did not apply',
+        })
 
     if status in ('ok', 'duplicate'):
         member = payload.user
-        registered = EventRegistration.query.filter_by(event_id=event.id, user_id=member.id).first() is not None
+        registered = EventRegistration.query.filter_by(event_id=event.id, user_id=member.id, status='approved').first() is not None
         result = {
             'status': status,
             'name': member.display_name,
@@ -1717,6 +2185,7 @@ def project_to_dict(o):
         'phase': o.phase,
         'accepts_applications': o.accepts_applications,
         'requires_profile': o.requires_profile,
+        'has_form': o.has_form,
         'deadline_passed': o.deadline_passed,
         'applications_open': o.applications_open,
         'poster': project_cover(o),
@@ -1775,11 +2244,32 @@ def api_project(id):
     return jsonify({
         **project_to_dict(o),
         'photos': [p.path for p in o.photos],
-        'my_application': {
-            'status': mine.status,
-            'applied_at': mine.applied_at.isoformat() if mine.applied_at else None,
-        } if mine else None,
+        'questions': [{
+            'id': q.id, 'label': q.label, 'help_text': q.help_text, 'kind': q.kind,
+            'required': q.required, 'options': q.options or [],
+        } for q in o.questions],
+        'my_application': _my_application(mine) if mine else None,
     })
+
+
+def _my_application(a):
+    return {
+        'status': a.status,
+        'applied_at': a.applied_at.isoformat() if a.applied_at else None,
+        # A team note stays with the team: only the message to the applicant goes out.
+        'note': a.decision_note,
+        'answers': a.answers or [],
+    }
+
+
+def _save_application(application):
+    db.session.add(application)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': 'You have already applied to this project.'}), 409
+    return jsonify({'my_application': _my_application(application)}), 201
 
 
 ENGLISH_LEVELS = ('Basic', 'Intermediate', 'Advanced', 'Fluent')
@@ -1787,6 +2277,7 @@ ENGLISH_LEVELS = ('Basic', 'Intermediate', 'Advanced', 'Fluent')
 
 @app.route('/api/projects/<int:id>/apply', methods=['POST'])
 @login_required
+@verified_email_required
 @limiter.limit('10 per minute')
 def api_project_apply(id):
     project = db.session.get(Opportunity, id)
@@ -1798,6 +2289,15 @@ def api_project_apply(id):
         return jsonify({'error': 'Please complete your profile before applying.'}), 403
 
     data = request.get_json(silent=True) or {}
+    if project.has_form:
+        answers, answer_errors = registration_service.clean_answers(project, data.get('answers'))
+        if answer_errors:
+            return jsonify({'error': 'Please check the highlighted answers.', 'errors': answer_errors}), 400
+        return _save_application(Application(
+            user_id=current_user.id, opportunity_id=project.id, full_name=current_user.full_name,
+            email=current_user.email, phone=current_user.phone, answers=answers,
+        ))
+
     field = lambda name: str(data.get(name) or '').strip()  # noqa: E731
     full_name, email, phone = field('full_name'), field('email').lower(), field('phone')
     residence, motivation, cv_link = field('residence'), field('motivation'), field('cv_link')
@@ -1826,21 +2326,11 @@ def api_project_apply(id):
     if errors:
         return jsonify({'error': errors[0], 'errors': errors}), 400
 
-    application = Application(
+    return _save_application(Application(
         user_id=current_user.id, opportunity_id=project.id, full_name=full_name, email=email, phone=phone,
         birth_date=birth_date, residence=residence, english_level=english_level, motivation=motivation,
         cv_link=cv_link or None,
-    )
-    db.session.add(application)
-    try:
-        db.session.commit()
-    except IntegrityError:
-        db.session.rollback()
-        return jsonify({'error': 'You have already applied to this project.'}), 409
-
-    return jsonify({
-        'my_application': {'status': application.status, 'applied_at': application.applied_at.isoformat()},
-    }), 201
+    ))
 
 
 # ---- public events api ----
@@ -1860,11 +2350,29 @@ def event_to_dict(e):
     }
 
 
+def _registration_to_dict(r):
+    return {
+        'status': r.status,
+        'submitted_at': r.created_at.isoformat() if r.created_at else None,
+        'decided_at': r.decided_at.isoformat() if r.decided_at else None,
+        'note': r.decision_note,
+        'answers': r.answers or [],
+    }
+
+
 def event_detail(e):
-    registered = current_user.is_authenticated and EventRegistration.query.filter_by(
+    registration = current_user.is_authenticated and EventRegistration.query.filter_by(
         event_id=e.id, user_id=current_user.id
-    ).first() is not None
-    return {**event_to_dict(e), 'is_registered': bool(registered)}
+    ).first()
+    return {
+        **event_to_dict(e),
+        'registration': _registration_to_dict(registration) if registration else None,
+        'email_notifications': mail_service.is_configured(),
+        'questions': [{
+            'id': q.id, 'label': q.label, 'help_text': q.help_text, 'kind': q.kind,
+            'required': q.required, 'options': q.options or [],
+        } for q in e.questions],
+    }
 
 
 @app.route('/api/events')
@@ -1905,6 +2413,7 @@ def api_event(id):
 
 @app.route('/api/events/<int:id>/register', methods=['POST'])
 @login_required
+@verified_email_required
 @limiter.limit('20 per minute')
 def api_event_register(id):
     event = _public_event_or_none(id)
@@ -1917,12 +2426,19 @@ def api_event_register(id):
         return jsonify({'error': 'This event has already started.'}), 400
     if event.spots_left == 0:
         return jsonify({'error': 'This event is full.'}), 400
+    if not event.registration_open:
+        return jsonify({'error': 'Applications for this event are not open yet.'}), 400
 
-    db.session.add(EventRegistration(event_id=event.id, user_id=current_user.id))
+    data = request.get_json(silent=True) or {}
+    answers, errors = registration_service.clean_answers(event, data.get('answers'))
+    if errors:
+        return jsonify({'error': 'Please check the highlighted answers.', 'errors': errors}), 400
+
+    db.session.add(EventRegistration(event_id=event.id, user_id=current_user.id, answers=answers))
     try:
         db.session.commit()
     except IntegrityError:
-        db.session.rollback()  # a double tap: already registered
+        db.session.rollback()  # a double tap: already applied
     db.session.refresh(event)
     return jsonify(event_detail(event)), 201
 
@@ -1938,6 +2454,9 @@ def api_event_unregister(id):
 
     registration = EventRegistration.query.filter_by(event_id=event.id, user_id=current_user.id).first()
     if registration:
+        # Otherwise a rejected applicant could withdraw and apply again.
+        if registration.status == 'rejected':
+            return jsonify({'error': 'This application has already been decided.'}), 400
         db.session.delete(registration)
         db.session.commit()
         db.session.refresh(event)
@@ -2093,26 +2612,37 @@ def api_story(slug):
 @app.route('/api/contact', methods=['POST'])
 @limiter.limit('5 per minute')
 def api_contact():
-    raw_name = request.form.get('name', '')[:150]
-    raw_email = request.form.get('email', '')[:150]
-    raw_message = request.form.get('message', '')[:5000]
+    if bot_check.problem(request.form):
+        return jsonify({'status': 'error', 'message': 'Please wait a moment and try again.'}), 400
 
-    if not all([raw_name, raw_email, raw_message]):
+    name = request.form.get('name', '').strip()[:100]
+    email = request.form.get('email', '').strip()[:120]
+    message = request.form.get('message', '').strip()[:5000]
+
+    if not all([name, email, message]):
         return jsonify({'status': 'error', 'message': 'Please fill in all fields.'}), 400
-
-    new_message = ContactMessage(
-        name=html.escape(raw_name),
-        email=html.escape(raw_email),
-        message=html.escape(raw_message)
-    )
+    if not EMAIL_RE.match(email):
+        return jsonify({'status': 'error', 'message': 'Please enter a valid email address.'}), 400
 
     try:
-        db.session.add(new_message)
+        db.session.add(ContactMessage(name=name, email=email, message=message))
         db.session.commit()
-        return jsonify({'status': 'success', 'message': 'Message sent successfully!'}), 200
     except Exception:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': 'An error occurred.'}), 500
+
+    _tell_team_about_message(name, email, message)
+    return jsonify({'status': 'success', 'message': 'Message sent successfully!'}), 200
+
+
+def _tell_team_about_message(name, email, message):
+    to = os.environ.get('CONTACT_NOTIFY_EMAIL')
+    if not to:
+        return
+    # Reply-To lets the team answer the visitor directly. The visitor's text stays out of
+    # the subject, and the mail only ever goes to our own address.
+    body = f'Saytdan yeni mesaj / New message from the site\n\nAd: {name}\nEmail: {email}\n\n{message}'
+    mail_service.send_later(to, 'IYDP: saytdan yeni mesaj / new site message', body, reply_to=email)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -2130,11 +2660,18 @@ def spa_catch_all(path):
         abort(404)
     file_path = os.path.join(DIST_DIR, path)
     if os.path.isfile(file_path):
-        return send_from_directory(DIST_DIR, path)
-    index_path = os.path.join(DIST_DIR, 'index.html')
-    if os.path.isfile(index_path):
-        return send_from_directory(DIST_DIR, 'index.html')
-    abort(404)
+        # File names under assets/ change with their content, so they can be kept for good.
+        if path.startswith('assets/'):
+            response = send_from_directory(DIST_DIR, path, max_age=31536000)
+            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+            return response
+        return send_from_directory(DIST_DIR, path, max_age=86400)
+    if path.startswith('api/'):
+        return jsonify({'error': 'Not found'}), 404
+    # A missing script from an older build must fail as one, not arrive as a web page.
+    if path.startswith('assets/'):
+        abort(404)
+    return serve_spa()
 
 
 if __name__ == '__main__':

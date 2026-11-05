@@ -29,12 +29,18 @@
                     <span class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                         {% if e.starts_at %}<span>{{ e.starts_at|datetimeformat('%H:%M') }}</span>{% endif %}
                         {% if e.location %}<span class="truncate">{{ ui.icon('map-pin', 'h-4 w-4 mr-1 text-slate-400') }}{{ e.location }}</span>{% endif %}
-                        <span>{{ ui.icon('user-check', 'h-3.5 w-3.5 mr-1 text-slate-400') }}{{ e.registrations|length }} registered · {{ e.attendances|length }} in</span>
+                        <span>{{ ui.icon('user-check', 'h-3.5 w-3.5 mr-1 text-slate-400') }}{{ e.approved_count }} approved · {{ e.attendances|length }} in</span>
+                        {% if e.pending_count %}<span class="font-semibold text-ired-dark">{{ e.pending_count }} waiting</span>{% endif %}
+                        {% if not e.has_form %}<span class="font-medium text-slate-600">No form yet</span>{% endif %}
                     </span>
                 </span>
                 {{ ui.status(e.is_public, on='On website', off='Hidden') }}
                 {{ ui.icon('chevron-right', 'h-3.5 w-3.5 text-slate-300') }}
             </a>
+            {{ ui.row_actions([
+                (url_for('event_attendance', id=e.id), 'users', 'Registered (' ~ e.registrations|length ~ ')'),
+                (url_for('event_form', id=e.id), 'clipboard-list', 'Form' if e.has_form else 'Create form'),
+            ]) }}
         </li>
         {% endfor %}
     </ul>
