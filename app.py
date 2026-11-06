@@ -71,6 +71,12 @@ if not _secret_key:
         'Set SECRET_KEY in your .env / hosting environment before deploying.',
         RuntimeWarning,
     )
+elif _secret_key == 'change-me-to-a-long-random-value':
+    # The placeholder from .env.example is public: anyone could sign an admin session with it.
+    raise RuntimeError('SECRET_KEY is still the example value. Generate one with: '
+                       'python -c "import secrets; print(secrets.token_hex(32))"')
+elif len(_secret_key) < 32:
+    warnings.warn('SECRET_KEY is short. Use at least 32 random characters in production.', RuntimeWarning)
 app.config['SECRET_KEY'] = _secret_key
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
