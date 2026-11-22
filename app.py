@@ -35,7 +35,7 @@ import qrcode.image.svg
 
 from models import (
     db, User, ContactMessage, Opportunity, OpportunityTag, OpportunityPhoto, Application,
-    News, Story, StoryPhoto, Payment, Event, EventRegistration, Attendance,
+    News, NewsPhoto, Story, StoryPhoto, Payment, Event, EventRegistration, Attendance,
     MemberProfile, ProfileEducation, ProfileExperience, ProfileLanguage,
     Notification, EventQuestion, ProjectQuestion, QUESTION_KINDS, utcnow,
     GENDERS, OCCUPATIONS, EDUCATION_LEVELS, EXPERIENCE_KINDS, LANGUAGE_LEVELS, INTERESTS,
@@ -179,7 +179,7 @@ def _detail_page(path):
         return None
     if kind == 'news':
         item = News.query.filter_by(id=int(key), is_published=True).first()
-        return item and (item.title, seo.description_from(item.content), item.image_url)
+        return item and (item.title, seo.description_from(item.content), news_cover(item))
     if kind == 'projects':
         item = Opportunity.query.filter_by(id=int(key), is_active=True).first()
         return item and (item.title, seo.description_from(item.description), item.poster_path)
@@ -365,23 +365,15 @@ def admin_required(f):
     return decorated_admin_required
 
 
-def get_news_album_images(keyword_image):
-    folder_name = (keyword_image or '').strip()
-    if not folder_name or any(x in folder_name for x in ('..', '/', '\\')):
-        return []
+def news_album(n):
+    return [p.path for p in n.photos]
 
-    album_dir = os.path.join(app.static_folder, 'news', folder_name)
-    if not os.path.isdir(album_dir):
-        return []
 
-    allowed_ext = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
-    image_files = []
-    static_base = app.static_url_path or '/static'
-    for name in sorted(os.listdir(album_dir), key=str.lower):
-        _, ext = os.path.splitext(name)
-        if ext.lower() in allowed_ext:
-            image_files.append(f'{static_base}/news/{folder_name}/{name}')
-    return image_files
+def news_cover(n):
+    """The uploaded cover, else the first album photo."""
+    if n.image_url:
+        return n.image_url
+    return n.photos[0].path if n.photos else None
 
 
 @app.route('/')
@@ -1335,61 +1327,92 @@ def list_news():
                          items=items,
                          search=search,
                          unread_count=unread_count)
+def _apply_news_form(news, form, stale):
+    """Copy the form and uploads onto news. Returns upload error strings."""
+    news.title = form['title'].strip()
+    news.content = form['content'].strip()
+    news.is_published = 'is_published' in form
+
+    errors = []
+    cover = request.files.get('cover')
+    if cover and cover.filename:
+        try:
+            new_path = upload_service.save_photo(
+                cover, app.static_folder, app.static_url_path or '/static', folder='news', kind='covers'
+            )
+            if news.image_url:
+                stale.append(news.image_url)
+            news.image_url = new_path
+        except upload_service.UploadError as e:
+            errors.append(str(e))
+    elif form.get('remove_cover') and news.image_url:
+        stale.append(news.image_url)
+        news.image_url = None
+
+    _apply_photo_edits(news, form, stale)
+    errors.extend(_add_uploaded_photos(news, NewsPhoto, 'news'))
+    return errors
+
+
+def _news_form_error(form):
+    if not form.get('title', '').strip() or not form.get('content', '').strip():
+        return 'Headline and text are required.'
+    return None
+
+
 @app.route('/admin/news/add', methods=['GET', 'POST'])
 @admin_required
 def add_news():
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
-
     if request.method == 'POST':
-        title = request.form.get('title')
-        content = request.form.get('content')
-        image_url = request.form.get('image_url')
-        is_published = 'is_published' in request.form
+        error = _news_form_error(request.form)
+        if error:
+            flash(error, 'error')
+            return render_template('admin/news/add.html', news=None, form=request.form)
 
-        if not title or not content:
-            flash('Title and content are required', 'error')
-            return redirect(url_for('add_news'))
-
-        news = News(
-            title=title,
-            content=content,
-            image_url=image_url if image_url else None,
-            is_published=is_published
-        )
-
+        news = News()
+        upload_errors = _apply_news_form(news, request.form, stale=[])
         db.session.add(news)
         db.session.commit()
-
+        for e in upload_errors:
+            flash(e, 'error')
         flash('News added successfully', 'success')
-        return redirect(url_for('list_news'))
+        return redirect(url_for('edit_news', id=news.id) if upload_errors else url_for('list_news'))
 
-    return render_template('admin/news/add.html', unread_count=unread_count)
+    return render_template('admin/news/add.html', news=None, form={})
+
 
 @app.route('/admin/news/edit/<int:id>', methods=['GET', 'POST'])
 @admin_required
 def edit_news(id):
     news = News.query.get_or_404(id)
-    unread_count = ContactMessage.query.filter_by(is_read=False).count()
 
     if request.method == 'POST':
-        news.title = request.form.get('title', news.title)
-        news.content = request.form.get('content', news.content)
-        news.image_url = request.form.get('image_url', news.image_url)
-        news.is_published = 'is_published' in request.form
+        error = _news_form_error(request.form)
+        if error:
+            flash(error, 'error')
+            return render_template('admin/news/edit.html', news=news, form=request.form)
+
+        stale = []
+        upload_errors = _apply_news_form(news, request.form, stale)
         news.updated_at = datetime.now(timezone.utc)
-
         db.session.commit()
+        _delete_files(stale)
+        for e in upload_errors:
+            flash(e, 'error')
         flash('News updated successfully', 'success')
-        return redirect(url_for('list_news'))
+        return redirect(url_for('edit_news', id=news.id) if upload_errors else url_for('list_news'))
 
-    return render_template('admin/news/edit.html', news=news, unread_count=unread_count)
+    return render_template('admin/news/edit.html', news=news, form={})
+
 
 @app.route('/admin/news/delete/<int:id>', methods=['POST'])
 @admin_required
 def delete_news(id):
     news = News.query.get_or_404(id)
+    paths = [news.image_url] + [p.path for p in news.photos]
     db.session.delete(news)
     db.session.commit()
+    _delete_files(paths)
     flash('News deleted successfully', 'success')
     return redirect(url_for('list_news'))
 @app.route('/news')
@@ -2164,7 +2187,7 @@ def api_home():
             'content': n.content,
             'image_url': n.image_url,
             'keyword_image': n.keyword_image,
-            'cover_image': (get_news_album_images(n.keyword_image) or [n.image_url])[0] if n.keyword_image or n.image_url else None,
+            'cover_image': news_cover(n),
             'view_count': n.view_count or 0,
             'created_at': n.created_at.isoformat() if n.created_at else None,
         } for n in news],
@@ -2495,15 +2518,14 @@ def api_news():
 
     items = []
     for n in pagination.items:
-        album = get_news_album_images(getattr(n, 'keyword_image', None))
         items.append({
             'id': n.id,
             'title': n.title,
             'content': n.content,
             'image_url': n.image_url,
             'keyword_image': n.keyword_image,
-            'cover_image': album[0] if album else n.image_url,
-            'album_images': album,
+            'cover_image': news_cover(n),
+            'album_images': news_album(n),
             'view_count': n.view_count or 0,
             'created_at': n.created_at.isoformat() if n.created_at else None,
         })
@@ -2527,8 +2549,6 @@ def api_news_detail(id):
     n.view_count = (n.view_count or 0) + 1
     db.session.commit()
 
-    album = get_news_album_images(getattr(n, 'keyword_image', None))
-
     related = News.query.filter(
         News.id != n.id, News.is_published == True
     ).order_by(News.created_at.desc()).limit(3).all()
@@ -2538,14 +2558,14 @@ def api_news_detail(id):
         'title': n.title,
         'content': n.content,
         'image_url': n.image_url,
-        'cover_image': album[0] if album else n.image_url,
-        'album_images': album,
+        'cover_image': news_cover(n),
+        'album_images': news_album(n),
         'view_count': n.view_count or 0,
         'created_at': n.created_at.isoformat() if n.created_at else None,
         'related': [{
             'id': r.id,
             'title': r.title,
-            'cover_image': (get_news_album_images(r.keyword_image) or [r.image_url])[0] if r.keyword_image or r.image_url else None,
+            'cover_image': news_cover(r),
             'created_at': r.created_at.isoformat() if r.created_at else None,
         } for r in related],
     })

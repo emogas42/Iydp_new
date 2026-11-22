@@ -38,3 +38,6 @@ migrations/**/__pycache__/
 
 # Test runs
 .pytest_cache/
+
+# Source materials (presentation, raw photos) — not part of the site
+_materials/

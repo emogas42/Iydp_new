@@ -1,6 +1,6 @@
 # Yükləmə təlimatı
 
-React tətbiqi (`src/`) build olunub Flask tərəfindən serve edilir, `/admin/*` isə ayrıca
+React tətbiqi (`src/`) build olunub Fl`ask tərəfindən serve edilir, `/admin/*` isə ayrıca
 server-rendered admin paneldir. Python 3.10+ lazımdır. Aşağıda VPS üçün yeniləmə qaydası, sonra
 cPanel variantı var.
 

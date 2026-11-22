@@ -345,6 +345,11 @@ class News(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=datetime.utcnow)
 
+    photos = db.relationship(
+        'NewsPhoto', backref='news', lazy=True,
+        order_by='NewsPhoto.position', cascade='all, delete-orphan'
+    )
+
     def __init__(self, **kwargs):
         super(News, self).__init__(**kwargs)
         if self.view_count is None:
@@ -352,6 +357,13 @@ class News(db.Model):
 
     def __repr__(self):
         return f'<News {self.title}>'
+
+
+class NewsPhoto(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    news_id = db.Column(db.Integer, db.ForeignKey('news.id'), nullable=False, index=True)
+    path = db.Column(db.String(255), nullable=False)
+    position = db.Column(db.Integer, default=0, nullable=False)
 
 
 class Story(db.Model):
