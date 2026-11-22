@@ -17,10 +17,10 @@ const AboutSection = () => {
   return (
     <section id="about" className="relative overflow-hidden">
       {/* Top part — colorful intro */}
-      <div className="relative bg-gradient-to-br from-primary-50 via-white to-secondary-50 py-20 lg:py-24">
+      <div className="relative bg-gradient-to-br from-primary-100/80 via-sky-100/50 to-secondary-100/70 py-20 lg:py-24">
         {/* Decorative blobs */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-primary-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-secondary-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-primary-500/25 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-secondary-500/24 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-5 lg:px-8 relative">
           <div className="text-center mb-14">
@@ -118,9 +118,11 @@ const AboutSection = () => {
         </div>
       </div>
 
-      {/* Bottom part — Objectives with colored cards */}
-      <div id="mission" className="bg-white py-20 lg:py-24">
-        <div className="max-w-7xl mx-auto px-5 lg:px-8">
+      {/* Bottom part — Objectives with subtle gradient & ambient lighting */}
+      <div id="mission" className="relative bg-gradient-to-b from-secondary-100/60 via-slate-100/70 to-primary-100/55 py-20 lg:py-28 overflow-hidden">
+        <div className="absolute top-1/2 -left-20 w-80 h-80 bg-accent-green/26 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-10 -right-20 w-80 h-80 bg-primary-500/25 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative max-w-7xl mx-auto px-5 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}

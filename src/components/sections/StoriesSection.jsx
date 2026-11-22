@@ -27,8 +27,12 @@ const StoriesSection = () => {
   const color = colors[active % colors.length]
 
   return (
-    <section id="stories" className="py-20 lg:py-28 bg-slate-50 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-5 lg:px-8">
+    <section id="stories" className="relative py-20 lg:py-28 bg-gradient-to-b from-slate-100/80 via-rose-100/55 to-secondary-100/50 overflow-hidden">
+      {/* Ambient Community Glow */}
+      <div className="absolute top-1/3 -right-28 w-96 h-96 bg-accent-red/26 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/3 -left-28 w-96 h-96 bg-secondary-500/25 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-5 lg:px-8">
         <SectionHeader
           badge="Real experiences"
           badgeColor="accent-red"

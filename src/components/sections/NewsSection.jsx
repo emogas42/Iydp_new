@@ -29,8 +29,12 @@ const NewsSection = () => {
   const color = accentColors[active % accentColors.length]
 
   return (
-    <section id="news" className="section-padding bg-gradient-to-b from-white to-slate-50">
-      <div className="max-w-7xl mx-auto px-5 lg:px-8">
+    <section id="news" className="relative py-20 lg:py-28 bg-gradient-to-b from-secondary-100/55 via-slate-100/75 to-primary-100/55 overflow-hidden">
+      {/* Ambient Glow */}
+      <div className="absolute -top-24 left-1/3 w-96 h-96 bg-primary-500/26 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 right-1/4 w-96 h-96 bg-secondary-500/22 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-5 lg:px-8">
         <SectionHeader
           badge="News & Updates"
           badgeColor="primary"

@@ -43,7 +43,11 @@ const Counter = ({ target, suffix }) => {
 
 const StatsSection = () => {
   return (
-    <section className="relative bg-gradient-to-b from-slate-50 to-white py-20 overflow-hidden border-y border-slate-100">
+    <section className="relative bg-gradient-to-b from-primary-100/60 via-slate-100/85 to-secondary-100/60 py-20 overflow-hidden border-y border-slate-200">
+      {/* Ambient Aurora Spots */}
+      <div className="absolute -top-24 left-1/4 w-96 h-72 bg-primary-500/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 right-1/4 w-96 h-72 bg-secondary-500/26 rounded-full blur-3xl pointer-events-none" />
+
       <div className="relative max-w-7xl mx-auto px-5 lg:px-8">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
           {stats.map((stat, i) => (

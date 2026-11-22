@@ -10,8 +10,12 @@ const FAQSection = () => {
   const toggle = (i) => setOpenIndex(openIndex === i ? null : i)
 
   return (
-    <section className="section-padding bg-white">
-      <div className="max-w-7xl mx-auto px-5 lg:px-8">
+    <section className="relative py-20 lg:py-28 bg-gradient-to-b from-primary-100/55 via-slate-100/75 to-emerald-100/50 overflow-hidden">
+      {/* Ambient Glow */}
+      <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent-green/28 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-10 left-10 w-96 h-96 bg-primary-500/26 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-5 lg:px-8">
         <SectionHeader
           badge="Support"
           badgeColor="accent-green"
@@ -32,8 +36,8 @@ const FAQSection = () => {
                 transition={{ delay: i * 0.05 }}
                 className={`rounded-2xl border transition-all duration-300 ${
                   isOpen
-                    ? 'border-primary-200 bg-primary-50/30 shadow-sm'
-                    : 'border-slate-100 bg-white hover:border-slate-200'
+                    ? 'border-primary-300 bg-white shadow-md'
+                    : 'border-slate-200/80 bg-white/90 hover:bg-white hover:border-slate-300 shadow-sm'
                 }`}
               >
                 <button

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Mail, MapPin, Phone, ArrowRight, Facebook, Instagram, Linkedin } from 'lucide-react'
+import { Mail, MapPin, Phone, ArrowRight, Facebook, Instagram, Linkedin, MessageCircle } from 'lucide-react'
 import { socialLinks, contactInfo } from '@/data'
 
 const Footer = () => {
@@ -79,22 +79,44 @@ const Footer = () => {
             </h4>
             <div className="space-y-3">
               <a
-                href={`mailto:${contactInfo.email}`}
-                className="flex items-start gap-3 text-slate-500 text-sm hover:text-primary-500 transition"
+                href={`mailto:${contactInfo.email}?subject=IYDP%20M%C3%BCraci%C9%99t`}
+                className="flex items-center gap-3 text-slate-500 text-sm hover:text-primary-500 transition group"
+                title="E-poçt tətbiqində aç və yaz"
               >
-                <Mail className="w-4 h-4 mt-0.5 shrink-0" />
-                {contactInfo.email}
+                <span className="w-7 h-7 rounded-lg bg-slate-200/60 flex items-center justify-center text-slate-500 group-hover:bg-primary-500 group-hover:text-white transition">
+                  <Mail className="w-3.5 h-3.5" />
+                </span>
+                <span>{contactInfo.email}</span>
               </a>
-              <a
-                href={`tel:${contactInfo.phone.replace(/\s/g, '')}`}
-                className="flex items-start gap-3 text-slate-500 text-sm hover:text-primary-500 transition"
-              >
-                <Phone className="w-4 h-4 mt-0.5 shrink-0" />
-                {contactInfo.phone}
-              </a>
+
+              <div className="flex items-center justify-between gap-2">
+                <a
+                  href={`tel:${contactInfo.phone.replace(/\s/g, '')}`}
+                  className="flex items-center gap-2.5 text-slate-500 text-sm hover:text-emerald-600 transition group"
+                  title="Zəng et"
+                >
+                  <span className="w-7 h-7 rounded-lg bg-slate-200/60 flex items-center justify-center text-slate-500 group-hover:bg-emerald-500 group-hover:text-white transition">
+                    <Phone className="w-3.5 h-3.5" />
+                  </span>
+                  <span>{contactInfo.phone}</span>
+                </a>
+                <a
+                  href={`https://wa.me/${contactInfo.phone.replace(/[\s+]/g, '')}?text=Salam,%20IYDP%20haqqında%20məlumat%20almaq%20istəyirəm`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-500/20 transition-all shadow-sm"
+                  title="WhatsApp-da birbaşa çat aç"
+                >
+                  <MessageCircle className="w-3 h-3" />
+                  <span>WhatsApp</span>
+                </a>
+              </div>
+
               <div className="flex items-start gap-3 text-slate-500 text-sm">
-                <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                {contactInfo.address}
+                <span className="w-7 h-7 rounded-lg bg-slate-200/60 flex items-center justify-center text-slate-500 shrink-0 mt-0.5">
+                  <MapPin className="w-3.5 h-3.5" />
+                </span>
+                <span>{contactInfo.address}</span>
               </div>
             </div>
           </div>

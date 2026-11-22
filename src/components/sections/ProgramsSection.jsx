@@ -6,8 +6,12 @@ import { programs } from '@/data'
 
 const ProgramsSection = () => {
   return (
-    <section id="programs" className="section-padding bg-white">
-      <div className="max-w-7xl mx-auto px-5 lg:px-8">
+    <section id="programs" className="relative py-20 lg:py-28 bg-gradient-to-b from-slate-100/95 via-primary-100/55 to-emerald-100/50 overflow-hidden">
+      {/* Ambient Aurora Glow */}
+      <div className="absolute top-1/4 -left-28 w-96 h-96 bg-primary-500/28 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 -right-28 w-96 h-96 bg-accent-green/30 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-5 lg:px-8">
           <SectionHeader
             badge="Opportunities"
             badgeColor="primary"
@@ -24,7 +28,7 @@ const ProgramsSection = () => {
               viewport={{ once: true }}
               transition={{ delay: i * 0.08, duration: 0.5 }}
               whileHover={{ y: -4 }}
-              className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl transition-all duration-300"
+              className="group bg-white/95 backdrop-blur-sm rounded-2xl border border-slate-200/80 overflow-hidden hover:border-primary-300 hover:shadow-xl transition-all duration-300"
             >
               <div className="relative h-48 overflow-hidden">
                 <img
